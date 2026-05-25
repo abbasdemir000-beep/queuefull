@@ -173,6 +173,10 @@ fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
                 }
             }
         }
+        
+        if (viewModel.showFeedbackRewardDialog) {
+            FeedbackRewardDialog(viewModel = viewModel)
+        }
     }
 }
 
@@ -285,7 +289,7 @@ fun LoginScreen(viewModel: QueueFuelViewModel) {
                         OutlinedTextField(
                             value = viewModel.authNameInput,
                             onValueChange = { viewModel.authNameInput = it },
-                            label = { Text("الاسم الكامل (اختياري)", color = CosmicTextGray, fontSize = 12.sp) },
+                            label = { Text("الاسم الكامل (مطلوب للتسجيل) 👤", color = CosmicTextGray, fontSize = 12.sp) },
                             singleLine = true,
                             leadingIcon = { Icon(Icons.Filled.Badge, contentDescription = null, tint = CosmicAccent) },
                             colors = OutlinedTextFieldDefaults.colors(
@@ -2108,6 +2112,18 @@ fun AlertsAndSecurityLog(viewModel: QueueFuelViewModel) {
                                 textAlign = TextAlign.Right,
                                 modifier = Modifier.fillMaxWidth()
                             )
+
+                            if (log.title.contains("انظر من حصل") || log.title.contains("دورة النقاط")) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { viewModel.showFeedbackRewardDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = CosmicAccent),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text("🥇 عرض المتنافسين ونقاطهم", fontSize = 11.sp, color = Color.White)
+                                }
+                            }
                         }
                     }
                 }
@@ -2170,6 +2186,83 @@ fun AdminDashboardPanel(viewModel: QueueFuelViewModel) {
                 AdminStatCounter("إجمالي المدن", allCities.size.toString())
                 AdminStatCounter("إجمالي المحطات", allStations.size.toString())
                 AdminStatCounter("طلبات معلقة", (pendingStations.size + pendingCities.size).toString())
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // 5-Hour Cycle countdown & competitor standings card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CosmicSurface),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, CosmicBorder),
+            elevation = CardDefaults.cardElevation(2.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = viewModel.timeRemainingString,
+                        color = CosmicAmber,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "مؤقت دورة الجوائز (5 ساعات) 🕒",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CosmicText
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(6.dp))
+                
+                Text(
+                    text = "سيقوم النظام تلقائياً بتصفير نتائج المتنافسين بعد انتهاء الدورة. مع تنبيه المشرف بالوصول لـ 4 ساعات و58 دقيقة لمكافأة الفائزين بقيمة النقاط الحالية.",
+                    color = CosmicTextLight,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Right,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { viewModel.resetCycleAction() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("إعادة تعيين الدورة يدوياً 🔄", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                    
+                    Button(
+                        onClick = { viewModel.showFeedbackRewardDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = CosmicAccent),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1.2f).height(36.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("🏆 عرض المتنافسين ونقاطهم", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
             }
         }
 
@@ -2735,4 +2828,158 @@ fun MyProfileScreen(viewModel: QueueFuelViewModel) {
             Text("تسجيل الخروج من الحساب", color = CosmicText, fontWeight = FontWeight.Bold)
         }
     }
+}
+
+@Composable
+fun FeedbackRewardDialog(viewModel: QueueFuelViewModel) {
+    val allQueueUpdates by viewModel.allQueueUpdates.collectAsState()
+    val allUsers by viewModel.allUsers.collectAsState()
+
+    val currentCycleUpdates = allQueueUpdates.filter { it.timestamp >= viewModel.cycleStartTime }
+    val phonesWhoFeedbacked = currentCycleUpdates.map { it.userPhone }.toSet()
+    
+    // Competitors: users who are not Admin and have submitted updates in this cycle
+    val competitors = allUsers.filter { phonesWhoFeedbacked.contains(it.phoneNumber) && it.role != "ADMIN" }
+        .map { user ->
+            val updateCount = currentCycleUpdates.count { it.userPhone == user.phoneNumber }
+            Triple(user, updateCount, user.points)
+        }
+        .sortedByDescending { it.third } // sort by points descending
+
+    AlertDialog(
+        onDismissRequest = { viewModel.showFeedbackRewardDialog = false },
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("🏆 المتنافسون وجوائز النقاط 🏆", color = CosmicText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                // Countdown card
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CosmicSurface),
+                    border = BorderStroke(1.dp, CosmicBorder),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "الوقت المتبقي لانتهاء دورة الـ 5 ساعات ونظام الجوائز",
+                            color = CosmicTextGray,
+                            fontSize = 10.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = viewModel.timeRemainingString,
+                            color = CosmicAmber,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+
+                Text(
+                    text = "الأشخاص الذين ساهموا في تحديث حالات السرا (مزدحم/فارغ) خلال دورة الـ 5 ساعات الحالية ونقاطهم الحالية لمكافأة الأكثر نشاطاً:",
+                    fontSize = 11.sp,
+                    color = CosmicTextLight,
+                    textAlign = TextAlign.Right,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                )
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (competitors.isEmpty()) {
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "لم يقم أحد بتقديم تقارير السرا في هذه الدورة حتى الآن! 🏁",
+                                    color = CosmicTextGray,
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    } else {
+                        items(competitors) { (user, count, points) ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = CosmicSurface),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, CosmicBorder),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Points/Scores view
+                                    Column(horizontalAlignment = Alignment.Start) {
+                                        Text(text = "النقاط المتراكمة", color = CosmicTextGray, fontSize = 9.sp)
+                                        Text(text = "$points ⚡", color = CosmicAmber, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    // User details
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(text = user.name, color = CosmicText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        Text(text = "الهاتف: ${user.phoneNumber}", color = CosmicTextLight, fontSize = 10.sp)
+                                        Text(
+                                            text = "مجموع التقارير في الدورة: $count 📊",
+                                            color = CosmicAccent,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (viewModel.currentUser?.role == "ADMIN") {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            viewModel.resetCycleAction()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("إعادة تعيين نقاط الدورة حالاً (إبدأ دورة جديدة) 🔄", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { viewModel.showFeedbackRewardDialog = false },
+                colors = ButtonDefaults.buttonColors(containerColor = CosmicAccent),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("حسناً 🤝", fontSize = 12.sp, color = Color.White)
+            }
+        },
+        containerColor = CosmicSecondaryBg,
+        textContentColor = CosmicText
+    )
 }

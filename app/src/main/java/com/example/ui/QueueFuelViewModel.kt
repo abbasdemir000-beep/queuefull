@@ -79,6 +79,97 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     val allUsers: StateFlow<List<AppUser>> = repository.allUsers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allQueueUpdates: StateFlow<List<QueueUpdate>> = repository.allQueueUpdates
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // 5-Hour Cycle configuration for scores/rewards
+    val CYCLE_DURATION_MS = 5 * 60 * 60 * 1000L // 5 hours in ms
+    val NOTIFICATION_TRIGGER_DELAY_MS = (4 * 60 * 60 + 58 * 60) * 1000L // 4 hours 58 minutes in ms
+
+    var cycleStartTime by mutableStateOf(0L)
+    var timeRemainingString by mutableStateOf("")
+    var showFeedbackRewardDialog by mutableStateOf(false)
+
+    private val prefs by lazy {
+        getApplication<Application>().getSharedPreferences("queue_fuel_pref", android.content.Context.MODE_PRIVATE)
+    }
+
+    private fun loadOrCreateCycle() {
+        var start = prefs.getLong("cycle_start_time", 0L)
+        val now = System.currentTimeMillis()
+        if (start == 0L || (now - start) >= CYCLE_DURATION_MS) {
+            start = now
+            prefs.edit().putLong("cycle_start_time", start).apply()
+            prefs.edit().putBoolean("reward_notice_sent", false).apply()
+            // Reset points if it actually expired (or call trigger cycle reset)
+            if (start != now) {
+                resetCycleAction()
+            }
+        }
+        cycleStartTime = start
+    }
+
+    fun resetCycleAction() {
+        viewModelScope.launch {
+            // Reset regular users points to 20
+            allUsers.value.forEach { u ->
+                if (u.role != "ADMIN") {
+                    repository.updateUser(u.copy(points = 20))
+                }
+            }
+            if (currentUser != null && currentUser?.role != "ADMIN") {
+                currentUser = currentUser?.copy(points = 20)
+            }
+            showToast("تمت إعادة تعيين الدورة وتصفير النقاط وبدء الحساب من جديد! 🔄🏁")
+        }
+    }
+
+    private fun updateCycleTimer() {
+        val now = System.currentTimeMillis()
+        val elapsed = now - cycleStartTime
+        val remaining = CYCLE_DURATION_MS - elapsed
+
+        if (remaining <= 0) {
+            // Cycle finished! Reset and start new cycle
+            cycleStartTime = now
+            prefs.edit().putLong("cycle_start_time", now).apply()
+            prefs.edit().putBoolean("reward_notice_sent", false).apply()
+            
+            viewModelScope.launch {
+                // Reset points for non-admins
+                allUsers.value.forEach { u ->
+                    if (u.role != "ADMIN") {
+                        repository.updateUser(u.copy(points = 20))
+                    }
+                }
+                if (currentUser != null && currentUser?.role != "ADMIN") {
+                    currentUser = currentUser?.copy(points = 20)
+                }
+                triggerPushNotification(
+                    "انتهاء دورة النقاط 🕒🏆",
+                    "انتهت الدورة الحالية (5 ساعات). تم تصفير النقاط للمنافسين وفتح باب المنافسة لدورة جديدة!"
+                )
+            }
+        } else {
+            // Check if we should trigger the 4h 58m notification
+            val isNoticeSent = prefs.getBoolean("reward_notice_sent", false)
+            if (!isNoticeSent && elapsed >= NOTIFICATION_TRIGGER_DELAY_MS) {
+                prefs.edit().putBoolean("reward_notice_sent", true).apply()
+                triggerPushNotification(
+                    "انظر من حصل على أعلى النقاط وقدم تقارير! 📊",
+                    "تنبيه: متبقي دقيقتان فقط على انتهاء الدورة! اعرض قائمة المشتركين ونقاطهم الحالية لتكريم الفائز."
+                )
+            }
+        }
+
+        // Format remaining time to hh:mm:ss for display
+        val totalSecs = maxOf(0L, remaining / 1000L)
+        val hrs = totalSecs / 3600
+        val mins = (totalSecs % 3600) / 60
+        val secs = totalSecs % 60
+        timeRemainingString = String.format("%02d:%02d:%02d", hrs, mins, secs)
+    }
+
     val approvedStations: StateFlow<List<Station>> = repository.approvedStations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -144,12 +235,25 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
                 expireOldUpdates()
             }
         }
+
+        // Initialize and start 5-hour countdown timer loop
+        loadOrCreateCycle()
+        viewModelScope.launch {
+            while (true) {
+                updateCycleTimer()
+                kotlinx.coroutines.delay(1000) // update countdown every second
+            }
+        }
     }
 
     // Auth Flows
     fun sendOtp() {
         if (authPhoneInput.length < 10) {
             showToast("الرجاء إدخال رقم هاتف صحيح")
+            return
+        }
+        if (authNameInput.trim().isBlank()) {
+            showToast("الرجاء إدخال الاسم الكامل أولاً لتسجيل الدخول والبدء بحصد جوائز نقاط التقارير!")
             return
         }
         // Generate a simple OTP, show it mockingly for demonstration
@@ -173,15 +277,32 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
                     showToast("هذا الحساب محظور بسبب تكرار البلاغات الخاطئة!")
                     return@launch
                 }
-                currentUser = existingUser
+                if (phone == "07774564334") {
+                    if (existingUser.role != "ADMIN") {
+                        val updated = existingUser.copy(role = "ADMIN")
+                        repository.updateUser(updated)
+                        currentUser = updated
+                    } else {
+                        currentUser = existingUser
+                    }
+                } else {
+                    if (existingUser.role == "ADMIN") {
+                        val updated = existingUser.copy(role = "USER")
+                        repository.updateUser(updated)
+                        currentUser = updated
+                    } else {
+                        currentUser = existingUser
+                    }
+                }
             } else {
                 val name = if (authNameInput.isNotBlank()) authNameInput else "مستخدم جديد"
-                // Allocate USER role by default
+                val assignedRole = if (phone == "07774564334") "ADMIN" else "USER"
+                val assignedPoints = if (assignedRole == "ADMIN") 250 else 20
                 val newUser = AppUser(
                     phoneNumber = phone,
                     name = name,
-                    role = "USER",
-                    points = 20
+                    role = assignedRole,
+                    points = assignedPoints
                 )
                 repository.insertUser(newUser)
                 currentUser = newUser

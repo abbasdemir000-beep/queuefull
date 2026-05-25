@@ -322,7 +322,7 @@ class QueueFuelRepository(context: Context) {
             // Insert default Admin user
             dao.insertUser(
                 AppUser(
-                    phoneNumber = "07700000000",
+                    phoneNumber = "07774564334",
                     name = "مدير المنصة (الأدمن)",
                     role = "ADMIN",
                     points = 250
