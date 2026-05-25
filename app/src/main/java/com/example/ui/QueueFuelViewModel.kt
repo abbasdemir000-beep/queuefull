@@ -11,6 +11,10 @@ import com.example.data.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.math.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 
 class QueueFuelViewModel(application: Application) : AndroidViewModel(application) {
     
@@ -90,8 +94,26 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     var timeRemainingString by mutableStateOf("")
     var showFeedbackRewardDialog by mutableStateOf(false)
 
+    // Firebase Cloud Sync Configuration
+    var firebaseDatabaseUrl by mutableStateOf("https://queuefuel-default-rtdb.firebaseio.com/")
+    var firebaseWebApiKey by mutableStateOf("")
+    var firebaseSyncEnabled by mutableStateOf(false)
+    var firebaseSyncStatus by mutableStateOf("وضع محلي (أوفلاين) 📴")
+    var isSyncInProgress by mutableStateOf(false)
+
     private val prefs by lazy {
         getApplication<Application>().getSharedPreferences("queue_fuel_pref", android.content.Context.MODE_PRIVATE)
+    }
+
+    fun loadFirebaseConfig() {
+        firebaseSyncEnabled = prefs.getBoolean("firebase_sync_enabled", false)
+        firebaseDatabaseUrl = prefs.getString("firebase_db_url", "https://queuefuel-default-rtdb.firebaseio.com/") ?: "https://queuefuel-default-rtdb.firebaseio.com/"
+        firebaseWebApiKey = prefs.getString("firebase_api_key", "") ?: ""
+        if (firebaseSyncEnabled) {
+            firebaseSyncStatus = "متصل بالسحابة 🟢"
+        } else {
+            firebaseSyncStatus = "وضع محلي (أوفلاين) 📴"
+        }
     }
 
     private fun loadOrCreateCycle() {
@@ -219,6 +241,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
     init {
+        loadFirebaseConfig()
         // Automatically default selectedCityId to the first city, if available
         viewModelScope.launch {
             approvedCities.collectLatest { cities ->
@@ -243,6 +266,17 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
                 updateCycleTimer()
                 kotlinx.coroutines.delay(1000) // update countdown every second
             }
+        }
+
+        // Reactive auto-sync to Firebase cloud on any local database changes (debounced)
+        viewModelScope.launch {
+            combine(allCities, allStations, allUsers, allQueueUpdates) { _, _, _, _ -> true }
+                .collectLatest {
+                    if (firebaseSyncEnabled) {
+                        kotlinx.coroutines.delay(2000) // 2 second debounce to prevent rapid redundant calls
+                        syncAllDataToFirebase()
+                    }
+                }
         }
     }
 
@@ -631,6 +665,98 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             "تحديث تلقائي للمحطات القريبة ⛽📍",
             "محطة ${station.name} القريبة منك أصبحت حالتها الآن: $icon بفضل تحديثات الزملاء!"
         )
+    }
+
+    fun saveFirebaseSettings(url: String, apiKey: String, enabled: Boolean) {
+        firebaseDatabaseUrl = url
+        firebaseWebApiKey = apiKey
+        firebaseSyncEnabled = enabled
+        firebaseSyncStatus = if (enabled) "متصل بالسحابة 🟢" else "وضع محلي (أوفلاين) 📴"
+        
+        prefs.edit()
+            .putBoolean("firebase_sync_enabled", enabled)
+            .putString("firebase_db_url", url)
+            .putString("firebase_api_key", apiKey)
+            .apply()
+
+        showToast("تم حفظ إعدادات سحابة فايربيس بنجاح! 💾☁️")
+        if (enabled) {
+            syncAllDataToFirebase()
+        }
+    }
+
+    fun syncAllDataToFirebase() {
+        if (isSyncInProgress) return
+        isSyncInProgress = true
+        firebaseSyncStatus = "جاري الحفظ والرفع إلى سحابة فايربيس... ⚡"
+
+        viewModelScope.launch {
+            try {
+                val usersJson = allUsers.value.filter { it.role != "ADMIN" }.joinToString(",") { u ->
+                    """{"phoneNumber":"${u.phoneNumber}","name":"${u.name}","role":"${u.role}","points":${u.points}}"""
+                }
+                val stationsJson = allStations.value.joinToString(",") { s ->
+                    """{"id":${s.id},"name":"${s.name}","cityId":${s.cityId},"cityName":"${s.cityName}","type":"${s.type}","queueStatus":"${s.queueStatus}","hasFuel":${s.hasFuel},"isApproved":${s.isApproved}}"""
+                }
+                val citiesJson = allCities.value.joinToString(",") { c ->
+                    """{"id":${c.id},"nameAr":"${c.nameAr}","nameEn":"${c.nameEn}","isApproved":${c.isApproved}}"""
+                }
+                val updatesJson = allQueueUpdates.value.joinToString(",") { q ->
+                    """{"id":${q.id},"stationId":${q.stationId},"userPhone":"${q.userPhone}","queueStatus":"${q.queueStatus}","fuelType":"${q.fuelType}","timestamp":${q.timestamp}}"""
+                }
+
+                val payload = """{
+  "sync_timestamp": ${System.currentTimeMillis()},
+  "users": [$usersJson],
+  "stations": [$stationsJson],
+  "cities": [$citiesJson],
+  "queue_updates": [$updatesJson]
+}"""
+
+                var url = firebaseDatabaseUrl.trim()
+                if (url.isBlank()) {
+                    firebaseSyncStatus = "خطأ: رابط فايربيس فارغ! 🔴"
+                    isSyncInProgress = false
+                    return@launch
+                }
+                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                    url = "https://$url"
+                }
+                if (!url.endsWith("/")) {
+                    url += "/"
+                }
+                url += "queue_fuel_data.json"
+                if (firebaseWebApiKey.isNotBlank()) {
+                    url += "?auth=$firebaseWebApiKey"
+                }
+
+                val client = OkHttpClient()
+                val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                val body = payload.toRequestBody(mediaType)
+                val request = Request.Builder()
+                    .url(url)
+                    .put(body)
+                    .build()
+
+                val response = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    client.newCall(request).execute()
+                }
+
+                if (response.isSuccessful) {
+                    firebaseSyncStatus = "متصل سحابياً ومزامن بنجاح! 🟢"
+                    showToast("تمت مزامنة كافة البيانات وصلاحيات الأدمن بنجاح مع الفايربيس! ☁️🏁")
+                } else {
+                    firebaseSyncStatus = "فشل المزامنة: رمز الخطأ ${response.code} 🔴"
+                    showToast("خطأ استجابة الفايربيس: ${response.code}. يرجى التحقق من القواعد!")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                firebaseSyncStatus = "فشل في الاتصال والرفع ⚠️"
+                showToast("خطأ اتصال فايربيس: تأكد من الإملاء وتوفر الإنترنت!")
+            } finally {
+                isSyncInProgress = false
+            }
+        }
     }
 
     private fun showToast(msg: String) {

@@ -2295,6 +2295,11 @@ fun AdminDashboardPanel(viewModel: QueueFuelViewModel) {
                 onClick = { adminSectionTab = 2 },
                 text = _text_wrap("إدارة الحسابات")
             )
+            Tab(
+                selected = adminSectionTab == 3,
+                onClick = { adminSectionTab = 3 },
+                text = _text_wrap("سحاب الفايربيس 🌐")
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -2341,10 +2346,16 @@ fun AdminDashboardPanel(viewModel: QueueFuelViewModel) {
                         AdminCityRequestCard(city, viewModel)
                     }
                 }
-            } else {
+            } else if (adminSectionTab == 2) {
                 // Users list block
-                items(allUsers) { user ->
+                val filteredUsers = allUsers.filter { it.role != "ADMIN" && it.phoneNumber != "07774564334" }
+                items(filteredUsers) { user ->
                     AdminUserBlockCard(user, viewModel)
+                }
+            } else {
+                // Firebase settings panel
+                item {
+                    FirebaseSettingsPanel(viewModel = viewModel)
                 }
             }
         }
@@ -2982,4 +2993,203 @@ fun FeedbackRewardDialog(viewModel: QueueFuelViewModel) {
         containerColor = CosmicSecondaryBg,
         textContentColor = CosmicText
     )
+}
+
+@Composable
+fun FirebaseSettingsPanel(viewModel: QueueFuelViewModel) {
+    var dbUrl by remember { mutableStateOf(viewModel.firebaseDatabaseUrl) }
+    var apiKey by remember { mutableStateOf(viewModel.firebaseWebApiKey) }
+    var syncOn by remember { mutableStateOf(viewModel.firebaseSyncEnabled) }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CosmicSurface),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, CosmicBorder),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Status indicator
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (viewModel.firebaseSyncEnabled) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFF6B7280).copy(alpha = 0.15f)
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, if (viewModel.firebaseSyncEnabled) Color(0xFF10B981) else CosmicBorder)
+                ) {
+                    Text(
+                        text = viewModel.firebaseSyncStatus,
+                        color = if (viewModel.firebaseSyncEnabled) Color(0xFF10B981) else CosmicTextGray,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                     )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "سحابة قاعدة بيانات فايربيس 🌐",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CosmicText
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "اربط تطبيقك مباشرة بحساب Firebase الخاص بك لنقل وتأمين كافة بيانات المستخدمين، المحطات، المدن، ومستويات الصلاحيات للأدمن بشكل آمن وسحابي.",
+                color = CosmicTextLight,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Right,
+                lineHeight = 16.sp,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Web URL
+            Text("رابط قاعدة بيانات فايربيس (URL) 🔗", fontSize = 11.sp, color = CosmicTextGray, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Right)
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedTextField(
+                value = dbUrl,
+                onValueChange = { dbUrl = it },
+                placeholder = { Text("https://your-project-rtdb.firebaseio.com/", color = CosmicTextLight.copy(alpha = 0.5f), fontSize = 12.sp) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Left, color = CosmicText, fontSize = 13.sp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = CosmicAccent,
+                    unfocusedBorderColor = CosmicBorder,
+                    focusedTextColor = CosmicText,
+                    unfocusedTextColor = CosmicText,
+                    focusedContainerColor = CosmicSecondaryBg,
+                    unfocusedContainerColor = CosmicSecondaryBg
+                )
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // API key / auth key
+            Text("رمز التحقق (API Auth Token / Optional) 🔑", fontSize = 11.sp, color = CosmicTextGray, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Right)
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                placeholder = { Text("أدخل رمز التحقق لحماية قاعدتك (اختياري)", color = CosmicTextLight.copy(alpha = 0.5f), fontSize = 11.sp) },
+                singleLine = true,
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Left, color = CosmicText, fontSize = 13.sp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = CosmicAccent,
+                    unfocusedBorderColor = CosmicBorder,
+                    focusedTextColor = CosmicText,
+                    unfocusedTextColor = CosmicText,
+                    focusedContainerColor = CosmicSecondaryBg,
+                    unfocusedContainerColor = CosmicSecondaryBg
+                )
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Switch to Enable / Disable Sync auto
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { syncOn = !syncOn }
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Switch(
+                    checked = syncOn,
+                    onCheckedChange = { syncOn = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = CosmicAccent,
+                        checkedTrackColor = CosmicAccent.copy(alpha = 0.4f),
+                        uncheckedThumbColor = CosmicBorder,
+                        uncheckedTrackColor = CosmicSecondaryBg
+                    )
+                )
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("تفعيل المزامنة السحابية التلقائية ⚡", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CosmicText)
+                    Text("مزامنة أي تغيير على المحطات أو المستخدمين فوراً", fontSize = 10.sp, color = CosmicTextLight)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Row buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Sync manually
+                Button(
+                    onClick = {
+                        viewModel.syncAllDataToFirebase()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = if (viewModel.firebaseSyncEnabled) CosmicAmber else CosmicBorder),
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = !viewModel.isSyncInProgress,
+                    modifier = Modifier.weight(1f).height(40.dp)
+                ) {
+                    if (viewModel.isSyncInProgress) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text(
+                            text = "مزامنة يدوية للبيانات 🚀",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (viewModel.firebaseSyncEnabled) Color.Black else CosmicTextGray
+                        )
+                    }
+                }
+
+                // Save Config
+                Button(
+                    onClick = {
+                        viewModel.saveFirebaseSettings(dbUrl, apiKey, syncOn)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CosmicAccent),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1.2f).height(40.dp)
+                ) {
+                    Text("حفظ الإعدادات والربط 💾", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(10.dp))
+            
+            // Helper configuration note
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CosmicSecondaryBg),
+                border = BorderStroke(1.dp, CosmicBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.End) {
+                    Text("خطوات الربط السريع 🚀:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = CosmicAccent)
+                    Text("1. توجه إلى console.firebase.google.com في متصفحك.", fontSize = 9.sp, color = CosmicTextLight, textAlign = TextAlign.Right)
+                    Text("2. أنشئ مشروعاً جديداً ثم توجّه إلى 'Realtime Database' وقُم بإنشائها.", fontSize = 9.sp, color = CosmicTextLight, textAlign = TextAlign.Right)
+                    Text("3. انسخ رابط قاعدة البيانات والصقه بالأعلى.", fontSize = 9.sp, color = CosmicTextLight, textAlign = TextAlign.Right)
+                    Text("4. من إعدادات القواعد (Rules) للمشروع حدد قراءة وكتابة كـ true للحساب المفتوح، أو استخدم رمز التحقق Token.", fontSize = 9.sp, color = CosmicTextLight, textAlign = TextAlign.Right)
+                    Text("5. سيتم فور رغبتك ترحيل كافة صلاحيات الأدمن، تقارير المنافسين والمحطات بنجاح تام!", fontSize = 9.sp, color = CosmicTextLight, textAlign = TextAlign.Right)
+                }
+            }
+        }
+    }
 }
