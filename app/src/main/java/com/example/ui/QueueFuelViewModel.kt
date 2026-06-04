@@ -7,7 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.*
+import com.example.data.repository.QueueFuelRepositoryImpl
+import com.example.domain.model.*
+import com.example.domain.repository.QueueFuelRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.math.*
@@ -18,7 +20,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 
 class QueueFuelViewModel(application: Application) : AndroidViewModel(application) {
     
-    private val repository = QueueFuelRepository(application)
+    private val repository: QueueFuelRepository = QueueFuelRepositoryImpl(application)
 
     // Auth States
     var isLoggedIn by mutableStateOf(false)

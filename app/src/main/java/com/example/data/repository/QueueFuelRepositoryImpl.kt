@@ -1,23 +1,48 @@
-package com.example.data
+package com.example.data.repository
 
 import android.content.Context
 import androidx.room.Room
+import com.example.data.local.AdBannerEntity
+import com.example.data.local.AppUserEntity
+import com.example.data.local.CityEntity
+import com.example.data.local.QueueFuelDatabase
+import com.example.data.local.StationEntity
+import com.example.data.local.toDomain
+import com.example.data.local.toEntity
+import com.example.domain.model.AdBanner
+import com.example.domain.model.AppUser
+import com.example.domain.model.City
+import com.example.domain.model.QueueUpdate
+import com.example.domain.model.Station
+import com.example.domain.repository.QueueFuelRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class QueueFuelRepository(context: Context) {
-    
+/**
+ * Room-backed implementation of [QueueFuelRepository].
+ *
+ * This is a structural extraction of the previous `QueueFuelRepository` concrete
+ * class. Behavior is preserved exactly:
+ *  - same database name ("queue_fuel.db") and destructive-migration fallback,
+ *  - same background seeding on first launch,
+ *  - same status/confirmation/reward write logic.
+ * The only difference is that persistence entities are mapped to/from domain
+ * models at this boundary.
+ */
+class QueueFuelRepositoryImpl(context: Context) : QueueFuelRepository {
+
     private val database: QueueFuelDatabase = Room.databaseBuilder(
         context.applicationContext,
         QueueFuelDatabase::class.java,
         "queue_fuel.db"
     )
-    .fallbackToDestructiveMigration()
-    .build()
+        .fallbackToDestructiveMigration()
+        .build()
 
     private val dao = database.dao()
 
@@ -28,55 +53,61 @@ class QueueFuelRepository(context: Context) {
         }
     }
 
-    // Exposure of Flows
-    val approvedCities: Flow<List<City>> = dao.getApprovedCities()
-    val allCities: Flow<List<City>> = dao.getAllCities()
-    val approvedStations: Flow<List<Station>> = dao.getApprovedStations()
-    val allStations: Flow<List<Station>> = dao.getAllStations()
-    val allBanners: Flow<List<AdBanner>> = dao.getAllBanners()
-    val allUsers: Flow<List<AppUser>> = dao.getAllUsers()
-    val allQueueUpdates: Flow<List<QueueUpdate>> = dao.getAllQueueUpdates()
+    // Exposure of Flows (mapped entity -> domain)
+    override val approvedCities: Flow<List<City>> =
+        dao.getApprovedCities().map { list -> list.map { it.toDomain() } }
+    override val allCities: Flow<List<City>> =
+        dao.getAllCities().map { list -> list.map { it.toDomain() } }
+    override val approvedStations: Flow<List<Station>> =
+        dao.getApprovedStations().map { list -> list.map { it.toDomain() } }
+    override val allStations: Flow<List<Station>> =
+        dao.getAllStations().map { list -> list.map { it.toDomain() } }
+    override val allBanners: Flow<List<AdBanner>> =
+        dao.getAllBanners().map { list -> list.map { it.toDomain() } }
+    override val allUsers: Flow<List<AppUser>> =
+        dao.getAllUsers().map { list -> list.map { it.toDomain() } }
+    override val allQueueUpdates: Flow<List<QueueUpdate>> =
+        dao.getAllQueueUpdates().map { list -> list.map { it.toDomain() } }
 
-    fun getStationsByCity(cityId: Int): Flow<List<Station>> {
-        return dao.getStationsByCity(cityId)
+    override fun getStationsByCity(cityId: Int): Flow<List<Station>> =
+        dao.getStationsByCity(cityId).map { list -> list.map { it.toDomain() } }
+
+    override fun getBannersByCity(city: String): Flow<List<AdBanner>> =
+        dao.getBannersByCity(city).map { list -> list.map { it.toDomain() } }
+
+    override fun getUpdatesForStation(stationId: Int): Flow<List<QueueUpdate>> =
+        dao.getUpdatesForStation(stationId).map { list -> list.map { it.toDomain() } }
+
+    override suspend fun insertCity(city: City) = withContext(Dispatchers.IO) {
+        dao.insertCity(city.toEntity())
+        Unit
     }
 
-    fun getBannersByCity(city: String): Flow<List<AdBanner>> {
-        return dao.getBannersByCity(city)
+    override suspend fun approveCity(city: City) = withContext(Dispatchers.IO) {
+        dao.updateCity(city.copy(isApproved = true).toEntity())
     }
 
-    fun getUpdatesForStation(stationId: Int): Flow<List<QueueUpdate>> {
-        return dao.getUpdatesForStation(stationId)
-    }
-
-    suspend fun insertCity(city: City) = withContext(Dispatchers.IO) {
-        dao.insertCity(city)
-    }
-
-    suspend fun approveCity(city: City) = withContext(Dispatchers.IO) {
-        dao.updateCity(city.copy(isApproved = true))
-    }
-
-    suspend fun deleteCity(id: Int) = withContext(Dispatchers.IO) {
+    override suspend fun deleteCity(id: Int) = withContext(Dispatchers.IO) {
         dao.deleteCityById(id)
     }
 
-    suspend fun insertStation(station: Station) = withContext(Dispatchers.IO) {
-        dao.insertStation(station)
+    override suspend fun insertStation(station: Station) = withContext(Dispatchers.IO) {
+        dao.insertStation(station.toEntity())
+        Unit
     }
 
-    suspend fun updateStation(station: Station) = withContext(Dispatchers.IO) {
-        dao.updateStation(station)
+    override suspend fun updateStation(station: Station) = withContext(Dispatchers.IO) {
+        dao.updateStation(station.toEntity())
     }
 
-    suspend fun deleteStation(id: Int) = withContext(Dispatchers.IO) {
+    override suspend fun deleteStation(id: Int) = withContext(Dispatchers.IO) {
         dao.deleteStationById(id)
     }
 
-    suspend fun insertQueueUpdate(update: QueueUpdate) = withContext(Dispatchers.IO) {
+    override suspend fun insertQueueUpdate(update: QueueUpdate) = withContext(Dispatchers.IO) {
         // First insert update
-        dao.insertQueueUpdate(update)
-        
+        dao.insertQueueUpdate(update.toEntity())
+
         // Then update the station's status
         val stations = dao.getAllStations().first()
         val station = stations.find { it.id == update.stationId }
@@ -94,13 +125,13 @@ class QueueFuelRepository(context: Context) {
                     lastUpdated = System.currentTimeMillis()
                 )
             )
-            
+
             // Reward points to user:
             rewardUserPoints(update.userPhone, 15)
         }
     }
 
-    suspend fun confirmQueueStatus(stationId: Int, userPhone: String) = withContext(Dispatchers.IO) {
+    override suspend fun confirmQueueStatus(stationId: Int, userPhone: String) = withContext(Dispatchers.IO) {
         val stations = dao.getAllStations().first()
         val station = stations.find { it.id == stationId }
         if (station != null) {
@@ -114,44 +145,45 @@ class QueueFuelRepository(context: Context) {
         }
     }
 
-    suspend fun rewardUserPoints(phone: String, pointsToAdd: Int) {
+    override suspend fun rewardUserPoints(phone: String, pointsToAdd: Int) {
         val user = dao.getUserByPhone(phone)
         if (user != null) {
             dao.updateUser(user.copy(points = user.points + pointsToAdd))
         }
     }
 
-    suspend fun insertBanner(banner: AdBanner) = withContext(Dispatchers.IO) {
-        dao.insertBanner(banner)
+    override suspend fun insertBanner(banner: AdBanner) = withContext(Dispatchers.IO) {
+        dao.insertBanner(banner.toEntity())
+        Unit
     }
 
-    suspend fun deleteBanner(id: Int) = withContext(Dispatchers.IO) {
+    override suspend fun deleteBanner(id: Int) = withContext(Dispatchers.IO) {
         dao.deleteBannerById(id)
     }
 
-    suspend fun getUserByPhone(phone: String): AppUser? = withContext(Dispatchers.IO) {
-        dao.getUserByPhone(phone)
+    override suspend fun getUserByPhone(phone: String): AppUser? = withContext(Dispatchers.IO) {
+        dao.getUserByPhone(phone)?.toDomain()
     }
 
-    suspend fun insertUser(user: AppUser) = withContext(Dispatchers.IO) {
-        dao.insertUser(user)
+    override suspend fun insertUser(user: AppUser) = withContext(Dispatchers.IO) {
+        dao.insertUser(user.toEntity())
     }
 
-    suspend fun updateUser(user: AppUser) = withContext(Dispatchers.IO) {
-        dao.updateUser(user)
+    override suspend fun updateUser(user: AppUser) = withContext(Dispatchers.IO) {
+        dao.updateUser(user.toEntity())
     }
 
     private suspend fun seedDatabaseIfEmpty() {
         val cities = dao.getApprovedCities().first()
         if (cities.isEmpty()) {
             // Insert standard cities
-            val kirkukId = dao.insertCity(City(nameAr = "كركوك", nameEn = "Kirkuk")).toInt()
-            val erbilId = dao.insertCity(City(nameAr = "أربيل", nameEn = "Erbil")).toInt()
-            val sulId = dao.insertCity(City(nameAr = "السليمانية", nameEn = "Sulaymaniyah")).toInt()
+            val kirkukId = dao.insertCity(CityEntity(nameAr = "كركوك", nameEn = "Kirkuk")).toInt()
+            val erbilId = dao.insertCity(CityEntity(nameAr = "أربيل", nameEn = "Erbil")).toInt()
+            val sulId = dao.insertCity(CityEntity(nameAr = "السليمانية", nameEn = "Sulaymaniyah")).toInt()
 
             // Insert standard stations (Kirkuk)
             dao.insertStation(
-                Station(
+                StationEntity(
                     cityId = kirkukId,
                     cityName = "كركوك",
                     name = "محطة كركوك الحكومية النموذجية",
@@ -165,7 +197,7 @@ class QueueFuelRepository(context: Context) {
                 )
             )
             dao.insertStation(
-                Station(
+                StationEntity(
                     cityId = kirkukId,
                     cityName = "كركوك",
                     name = "محطة بابا كركر الأهلية",
@@ -179,7 +211,7 @@ class QueueFuelRepository(context: Context) {
                 )
             )
             dao.insertStation(
-                Station(
+                StationEntity(
                     cityId = kirkukId,
                     cityName = "كركوك",
                     name = "محطة طريق بغداد الحكومية",
@@ -193,7 +225,7 @@ class QueueFuelRepository(context: Context) {
                 )
             )
             dao.insertStation(
-                Station(
+                StationEntity(
                     cityId = kirkukId,
                     cityName = "كركوك",
                     name = "محطة غرناطة الأهلية",
@@ -209,7 +241,7 @@ class QueueFuelRepository(context: Context) {
 
             // Erbil
             dao.insertStation(
-                Station(
+                StationEntity(
                     cityId = erbilId,
                     cityName = "أربيل",
                     name = "محطة كولان الأهلية الحديثة",
@@ -223,7 +255,7 @@ class QueueFuelRepository(context: Context) {
                 )
             )
             dao.insertStation(
-                Station(
+                StationEntity(
                     cityId = erbilId,
                     cityName = "أربيل",
                     name = "محطة أربيل المركزية الحكومية",
@@ -237,7 +269,7 @@ class QueueFuelRepository(context: Context) {
                 )
             )
             dao.insertStation(
-                Station(
+                StationEntity(
                     cityId = erbilId,
                     cityName = "أربيل",
                     name = "محطة طريق الموصل الأهلية",
@@ -253,7 +285,7 @@ class QueueFuelRepository(context: Context) {
 
             // Sulaymaniyah
             dao.insertStation(
-                Station(
+                StationEntity(
                     cityId = sulId,
                     cityName = "السليمانية",
                     name = "محطة بختياري الأهلية الممتازة",
@@ -267,7 +299,7 @@ class QueueFuelRepository(context: Context) {
                 )
             )
             dao.insertStation(
-                Station(
+                StationEntity(
                     cityId = sulId,
                     cityName = "السليمانية",
                     name = "محطة عقبة بن نافع الحكومية",
@@ -283,7 +315,7 @@ class QueueFuelRepository(context: Context) {
 
             // Insert standard banners
             dao.insertBanner(
-                AdBanner(
+                AdBannerEntity(
                     title = "شركة الرافدين لزيوت السيارات 🚘",
                     description = "خصم 20% على تبديل زيت المحرك الأصلي مع فلتر مجاني لجميع منتظري سرا كركوك! اتصل الآن.",
                     city = "كركوك",
@@ -292,7 +324,7 @@ class QueueFuelRepository(context: Context) {
                 )
             )
             dao.insertBanner(
-                AdBanner(
+                AdBannerEntity(
                     title = "كراج أربيل الحديث للصيانة 🛠️",
                     description = "فحص كمبيوتر مجاني وصيانة وتعديل الهيدروليك. موقعنا قرب محطة كولان الأهلية.",
                     city = "أربيل",
@@ -301,7 +333,7 @@ class QueueFuelRepository(context: Context) {
                 )
             )
             dao.insertBanner(
-                AdBanner(
+                AdBannerEntity(
                     title = "مطعم كباب السرا السليمانية 🍢",
                     description = "توصيل مجاني ومباشر إلى سيارتك أثناء انتظارك في السرا! اشتر وجبتين واحصل على كوكا مجانية.",
                     city = "السليمانية",
@@ -310,7 +342,7 @@ class QueueFuelRepository(context: Context) {
                 )
             )
             dao.insertBanner(
-                AdBanner(
+                AdBannerEntity(
                     title = "مركز الفارس لغسيل السيارات السريع 🧼",
                     description = "تلييع وغسيل بخاري بأحدث الأجهزة. خصم 15% عند إظهار الكوبون من تطبيق QueueFuel.",
                     city = "كركوك",
@@ -321,7 +353,7 @@ class QueueFuelRepository(context: Context) {
 
             // Insert default Admin user
             dao.insertUser(
-                AppUser(
+                AppUserEntity(
                     phoneNumber = "07774564334",
                     name = "مدير المنصة (الأدمن)",
                     role = "ADMIN",
@@ -330,7 +362,7 @@ class QueueFuelRepository(context: Context) {
             )
             // Insert standard Reporter
             dao.insertUser(
-                AppUser(
+                AppUserEntity(
                     phoneNumber = "07712345678",
                     name = "أحمد البلاغي (مراسل)",
                     role = "REPORTER",
