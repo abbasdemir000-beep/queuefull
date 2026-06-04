@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.domain.model.*
+import com.example.domain.usecase.AuthPolicy
 import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -2348,7 +2349,7 @@ fun AdminDashboardPanel(viewModel: QueueFuelViewModel) {
                 }
             } else if (adminSectionTab == 2) {
                 // Users list block
-                val filteredUsers = allUsers.filter { it.role != "ADMIN" && it.phoneNumber != "07774564334" }
+                val filteredUsers = allUsers.filter { it.role != "ADMIN" && it.phoneNumber != AuthPolicy.ADMIN_PHONE }
                 items(filteredUsers) { user ->
                     AdminUserBlockCard(user, viewModel)
                 }
