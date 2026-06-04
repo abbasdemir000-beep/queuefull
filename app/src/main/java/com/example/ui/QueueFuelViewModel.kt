@@ -10,9 +10,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.repository.QueueFuelRepositoryImpl
 import com.example.domain.model.*
 import com.example.domain.repository.QueueFuelRepository
+import com.example.domain.usecase.CyclePolicy
+import com.example.domain.usecase.GeoProximity
+import com.example.domain.usecase.PointsPolicy
+import com.example.domain.usecase.StatusExpiryPolicy
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlin.math.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -88,9 +91,9 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     val allQueueUpdates: StateFlow<List<QueueUpdate>> = repository.allQueueUpdates
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // 5-Hour Cycle configuration for scores/rewards
-    val CYCLE_DURATION_MS = 5 * 60 * 60 * 1000L // 5 hours in ms
-    val NOTIFICATION_TRIGGER_DELAY_MS = (4 * 60 * 60 + 58 * 60) * 1000L // 4 hours 58 minutes in ms
+    // 5-Hour Cycle configuration for scores/rewards (timing logic lives in CyclePolicy)
+    val CYCLE_DURATION_MS = CyclePolicy.CYCLE_DURATION_MS // 5 hours in ms
+    val NOTIFICATION_TRIGGER_DELAY_MS = CyclePolicy.PRE_END_NOTICE_DELAY_MS // 4 hours 58 minutes in ms
 
     var cycleStartTime by mutableStateOf(0L)
     var timeRemainingString by mutableStateOf("")
@@ -138,11 +141,11 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             // Reset regular users points to 20
             allUsers.value.forEach { u ->
                 if (u.role != "ADMIN") {
-                    repository.updateUser(u.copy(points = 20))
+                    repository.updateUser(u.copy(points = PointsPolicy.CYCLE_RESET_POINTS))
                 }
             }
             if (currentUser != null && currentUser?.role != "ADMIN") {
-                currentUser = currentUser?.copy(points = 20)
+                currentUser = currentUser?.copy(points = PointsPolicy.CYCLE_RESET_POINTS)
             }
             showToast("تمت إعادة تعيين الدورة وتصفير النقاط وبدء الحساب من جديد! 🔄🏁")
         }
@@ -151,9 +154,9 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     private fun updateCycleTimer() {
         val now = System.currentTimeMillis()
         val elapsed = now - cycleStartTime
-        val remaining = CYCLE_DURATION_MS - elapsed
+        val remaining = CyclePolicy.remainingMs(cycleStartTime, now)
 
-        if (remaining <= 0) {
+        if (CyclePolicy.isCycleComplete(cycleStartTime, now)) {
             // Cycle finished! Reset and start new cycle
             cycleStartTime = now
             prefs.edit().putLong("cycle_start_time", now).apply()
@@ -163,11 +166,11 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
                 // Reset points for non-admins
                 allUsers.value.forEach { u ->
                     if (u.role != "ADMIN") {
-                        repository.updateUser(u.copy(points = 20))
+                        repository.updateUser(u.copy(points = PointsPolicy.CYCLE_RESET_POINTS))
                     }
                 }
                 if (currentUser != null && currentUser?.role != "ADMIN") {
-                    currentUser = currentUser?.copy(points = 20)
+                    currentUser = currentUser?.copy(points = PointsPolicy.CYCLE_RESET_POINTS)
                 }
                 triggerPushNotification(
                     "انتهاء دورة النقاط 🕒🏆",
@@ -177,7 +180,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
         } else {
             // Check if we should trigger the 4h 58m notification
             val isNoticeSent = prefs.getBoolean("reward_notice_sent", false)
-            if (!isNoticeSent && elapsed >= NOTIFICATION_TRIGGER_DELAY_MS) {
+            if (!isNoticeSent && CyclePolicy.shouldSendPreEndNotice(elapsed)) {
                 prefs.edit().putBoolean("reward_notice_sent", true).apply()
                 triggerPushNotification(
                     "انظر من حصل على أعلى النقاط وقدم تقارير! 📊",
@@ -187,11 +190,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         // Format remaining time to hh:mm:ss for display
-        val totalSecs = maxOf(0L, remaining / 1000L)
-        val hrs = totalSecs / 3600
-        val mins = (totalSecs % 3600) / 60
-        val secs = totalSecs % 60
-        timeRemainingString = String.format("%02d:%02d:%02d", hrs, mins, secs)
+        timeRemainingString = CyclePolicy.formatRemaining(remaining)
     }
 
     val approvedStations: StateFlow<List<Station>> = repository.approvedStations
@@ -333,7 +332,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             } else {
                 val name = if (authNameInput.isNotBlank()) authNameInput else "مستخدم جديد"
                 val assignedRole = if (phone == "07774564334") "ADMIN" else "USER"
-                val assignedPoints = if (assignedRole == "ADMIN") 250 else 20
+                val assignedPoints = if (assignedRole == "ADMIN") PointsPolicy.ADMIN_INITIAL_POINTS else PointsPolicy.WELCOME_POINTS
                 val newUser = AppUser(
                     phoneNumber = phone,
                     name = name,
@@ -375,20 +374,18 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     // Location & Proximity Logic
-    // Compute distance in meters between two coordinates (Haversine formula)
+    // Compute distance in meters between two coordinates (Haversine formula).
+    // Delegates to the pure GeoProximity use-case; signature kept for existing callers (UI).
     fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6371000.0 // Earth radius in meters
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2).pow(2) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return r * c
+        return GeoProximity.distanceMeters(lat1, lon1, lat2, lon2)
     }
 
     fun isUserNear(station: Station): Boolean {
         if (!simulateGpsEnabled) return true // Bypass check if disabled / mock admin mode
-        val dist = calculateDistance(simLatitude, simLongitude, station.latitude, station.longitude)
-        return dist <= 200.0 // True if user is within 200 meters
+        // True if user is within the default reporting radius (200 meters)
+        return GeoProximity.isWithinRadius(
+            simLatitude, simLongitude, station.latitude, station.longitude
+        )
     }
 
     // Submit user update
@@ -528,7 +525,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
 
             // Earn points for correct suggestion
             currentUser?.let {
-                repository.rewardUserPoints(it.phoneNumber, 30)
+                repository.rewardUserPoints(it.phoneNumber, PointsPolicy.STATION_SUGGESTION_POINTS)
                 currentUser = repository.getUserByPhone(it.phoneNumber)
             }
 
@@ -560,7 +557,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             
             // Reward suggesting user if available
             station.suggestedBy?.let { phone ->
-                repository.rewardUserPoints(phone, 50) 
+                repository.rewardUserPoints(phone, PointsPolicy.STATION_APPROVAL_POINTS)
             }
         }
     }
@@ -629,7 +626,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
         val now = System.currentTimeMillis()
         currentStations.forEach { station ->
             // If last updated is older than 40 minutes (2,400,000 ms) and not EMPTY, reset to EMPTY or moderate
-            if (station.queueStatus != "EMPTY" && (now - station.lastUpdated) > 2400000) {
+            if (StatusExpiryPolicy.isExpired(station.queueStatus, station.lastUpdated, now)) {
                 repository.updateStation(
                     station.copy(
                         queueStatus = "EMPTY", // Reset to empty queue on expiry
