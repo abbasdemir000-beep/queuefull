@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.repository.QueueFuelRepositoryImpl
 import com.example.domain.model.*
 import com.example.domain.repository.QueueFuelRepository
+import com.example.domain.usecase.AuthPolicy
 import com.example.domain.usecase.CyclePolicy
 import com.example.domain.usecase.GeoProximity
 import com.example.domain.usecase.PointsPolicy
@@ -283,16 +284,16 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
 
     // Auth Flows
     fun sendOtp() {
-        if (authPhoneInput.length < 10) {
+        if (!AuthPolicy.isValidPhone(authPhoneInput)) {
             showToast("الرجاء إدخال رقم هاتف صحيح")
             return
         }
-        if (authNameInput.trim().isBlank()) {
+        if (!AuthPolicy.isValidName(authNameInput)) {
             showToast("الرجاء إدخال الاسم الكامل أولاً لتسجيل الدخول والبدء بحصد جوائز نقاط التقارير!")
             return
         }
         // Generate a simple OTP, show it mockingly for demonstration
-        val randomOtp = (1000..9999).random().toString()
+        val randomOtp = AuthPolicy.generateOtp()
         simulatedOtp = randomOtp
         isOtpSent = true
         showToast("تم إرسال رمز التحقق: $randomOtp")
@@ -300,7 +301,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun verifyOtp() {
-        if (authOtpInput != simulatedOtp && authOtpInput != "1234") {
+        if (!AuthPolicy.isOtpValid(authOtpInput, simulatedOtp)) {
             showToast("رمز التحقق غير صحيح!")
             return
         }
@@ -308,11 +309,11 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             val phone = authPhoneInput
             val existingUser = repository.getUserByPhone(phone)
             if (existingUser != null) {
-                if (existingUser.banned) {
+                if (AuthPolicy.isUserBanned(existingUser)) {
                     showToast("هذا الحساب محظور بسبب تكرار البلاغات الخاطئة!")
                     return@launch
                 }
-                if (phone == "07774564334") {
+                if (AuthPolicy.isAdminPhone(phone)) {
                     if (existingUser.role != "ADMIN") {
                         val updated = existingUser.copy(role = "ADMIN")
                         repository.updateUser(updated)
@@ -331,7 +332,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             } else {
                 val name = if (authNameInput.isNotBlank()) authNameInput else "مستخدم جديد"
-                val assignedRole = if (phone == "07774564334") "ADMIN" else "USER"
+                val assignedRole = AuthPolicy.resolveRole(phone)
                 val assignedPoints = if (assignedRole == "ADMIN") PointsPolicy.ADMIN_INITIAL_POINTS else PointsPolicy.WELCOME_POINTS
                 val newUser = AppUser(
                     phoneNumber = phone,
