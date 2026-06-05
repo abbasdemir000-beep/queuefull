@@ -2,6 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../presentation/screens/admin/admin_cities_screen.dart';
+import '../../presentation/screens/admin/admin_panel_screen.dart';
+import '../../presentation/screens/admin/admin_stations_screen.dart';
+import '../../presentation/screens/admin/admin_suggestions_screen.dart';
+import '../../presentation/screens/admin/admin_users_screen.dart';
+import '../../presentation/screens/auth/otp_verification_screen.dart';
+import '../../presentation/screens/auth/phone_input_screen.dart';
+import '../../presentation/screens/home/home_screen.dart';
+import '../../presentation/screens/notifications/notification_screen.dart';
+import '../../presentation/screens/splash/splash_screen.dart';
+import '../../presentation/screens/station/report_status_screen.dart';
+import '../../presentation/screens/station/station_detail_screen.dart';
+
 /// Route path constants
 class AppRoutes {
   AppRoutes._();
@@ -10,10 +23,6 @@ class AppRoutes {
   static const String auth = '/auth';
   static const String authOtp = '/auth/otp';
   static const String home = '/home';
-  static const String map = '/map';
-  static const String stations = '/stations';
-  static const String leaderboard = '/leaderboard';
-  static const String profile = '/profile';
   static const String stationDetail = '/station/:id';
   static const String stationReport = '/station/:id/report';
   static const String notifications = '/notifications';
@@ -26,11 +35,11 @@ class AppRoutes {
 
 /// Provider for auth state used by the router redirect logic.
 /// This will be overridden in the actual app with real auth state.
-final authStateProvider = StateProvider<bool>((ref) => false);
+final routerAuthStateProvider = StateProvider<bool>((ref) => false);
 
 /// GoRouter provider
 final routerProvider = Provider<GoRouter>((ref) {
-  final isLoggedIn = ref.watch(authStateProvider);
+  final isLoggedIn = ref.watch(routerAuthStateProvider);
 
   return GoRouter(
     initialLocation: AppRoutes.splash,
@@ -58,59 +67,35 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.splash,
         name: 'splash',
-        builder: (context, state) => const _PlaceholderScreen(title: 'Splash'),
+        builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(
         path: AppRoutes.auth,
         name: 'auth',
-        builder: (context, state) => const _PlaceholderScreen(title: 'Auth'),
+        builder: (context, state) => const PhoneInputScreen(),
       ),
       GoRoute(
         path: AppRoutes.authOtp,
         name: 'authOtp',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'OTP Verification'),
+        builder: (context, state) {
+          final extra = state.extra as Map<String, String>?;
+          return OtpVerificationScreen(
+            phoneNumber: extra?['phone'] ?? '',
+            name: extra?['name'] ?? '',
+          );
+        },
       ),
-      ShellRoute(
-        builder: (context, state, child) => _ShellScaffold(child: child),
-        routes: [
-          GoRoute(
-            path: AppRoutes.home,
-            name: 'home',
-            builder: (context, state) =>
-                const _PlaceholderScreen(title: 'Home'),
-          ),
-          GoRoute(
-            path: AppRoutes.map,
-            name: 'map',
-            builder: (context, state) => const _PlaceholderScreen(title: 'Map'),
-          ),
-          GoRoute(
-            path: AppRoutes.stations,
-            name: 'stations',
-            builder: (context, state) =>
-                const _PlaceholderScreen(title: 'Stations'),
-          ),
-          GoRoute(
-            path: AppRoutes.leaderboard,
-            name: 'leaderboard',
-            builder: (context, state) =>
-                const _PlaceholderScreen(title: 'Leaderboard'),
-          ),
-          GoRoute(
-            path: AppRoutes.profile,
-            name: 'profile',
-            builder: (context, state) =>
-                const _PlaceholderScreen(title: 'Profile'),
-          ),
-        ],
+      GoRoute(
+        path: AppRoutes.home,
+        name: 'home',
+        builder: (context, state) => const HomeScreen(),
       ),
       GoRoute(
         path: AppRoutes.stationDetail,
         name: 'stationDetail',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
-          return _PlaceholderScreen(title: 'Station $id');
+          return StationDetailScreen(stationId: id);
         },
       ),
       GoRoute(
@@ -118,116 +103,39 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'stationReport',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
-          return _PlaceholderScreen(title: 'Report for $id');
+          return ReportStatusScreen(stationId: id);
         },
       ),
       GoRoute(
         path: AppRoutes.notifications,
         name: 'notifications',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Notifications'),
+        builder: (context, state) => const NotificationScreen(),
       ),
       GoRoute(
         path: AppRoutes.admin,
         name: 'admin',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Admin Panel'),
+        builder: (context, state) => const AdminPanelScreen(),
       ),
       GoRoute(
         path: AppRoutes.adminStations,
         name: 'adminStations',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Manage Stations'),
+        builder: (context, state) => const AdminStationsScreen(),
       ),
       GoRoute(
         path: AppRoutes.adminCities,
         name: 'adminCities',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Manage Cities'),
+        builder: (context, state) => const AdminCitiesScreen(),
       ),
       GoRoute(
         path: AppRoutes.adminUsers,
         name: 'adminUsers',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Manage Users'),
+        builder: (context, state) => const AdminUsersScreen(),
       ),
       GoRoute(
         path: AppRoutes.adminSuggestions,
         name: 'adminSuggestions',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Pending Suggestions'),
+        builder: (context, state) => const AdminSuggestionsScreen(),
       ),
     ],
   );
 });
-
-/// Placeholder screen used until real screens are implemented
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(child: Text(title)),
-    );
-  }
-}
-
-/// Shell scaffold with bottom navigation for main tabs
-class _ShellScaffold extends StatelessWidget {
-  const _ShellScaffold({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _calculateIndex(GoRouterState.of(context).matchedLocation),
-        onTap: (index) => _onTap(context, index),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.local_gas_station), label: 'Stations'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.leaderboard), label: 'Leaderboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
-      ),
-    );
-  }
-
-  int _calculateIndex(String location) {
-    if (location.startsWith(AppRoutes.map)) return 1;
-    if (location.startsWith(AppRoutes.stations)) return 2;
-    if (location.startsWith(AppRoutes.leaderboard)) return 3;
-    if (location.startsWith(AppRoutes.profile)) return 4;
-    return 0;
-  }
-
-  void _onTap(BuildContext context, int index) {
-    switch (index) {
-      case 0:
-        context.go(AppRoutes.home);
-        break;
-      case 1:
-        context.go(AppRoutes.map);
-        break;
-      case 2:
-        context.go(AppRoutes.stations);
-        break;
-      case 3:
-        context.go(AppRoutes.leaderboard);
-        break;
-      case 4:
-        context.go(AppRoutes.profile);
-        break;
-    }
-  }
-}

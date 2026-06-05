@@ -57,4 +57,11 @@ class FirestoreCityRepository implements CityRepository {
   Future<void> deleteCity(String cityId) async {
     await _collection.doc(cityId).delete();
   }
+
+  @override
+  Future<void> addCity(City city) async {
+    final json = city.toJson();
+    json.remove('id'); // Let Firestore auto-generate the ID
+    await _collection.add(json);
+  }
 }

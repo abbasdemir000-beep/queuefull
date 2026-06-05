@@ -25,4 +25,10 @@ abstract class StationRepository {
 
   /// Confirm the current status of a station (user agreement).
   Future<void> confirmStatus(String stationId, String userPhone);
+
+  /// Approve a pending station (admin action).
+  Future<void> approveStation(String stationId);
+
+  /// Delete a station (admin action).
+  Future<void> deleteStation(String stationId);
 }

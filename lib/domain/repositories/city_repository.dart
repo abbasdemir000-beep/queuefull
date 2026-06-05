@@ -17,4 +17,7 @@ abstract class CityRepository {
 
   /// Delete a city (admin action).
   Future<void> deleteCity(String cityId);
+
+  /// Add a new city directly (admin action, auto-approved).
+  Future<void> addCity(City city);
 }

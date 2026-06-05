@@ -24,4 +24,10 @@ abstract class UserRepository {
 
   /// Award points to a user.
   Future<void> awardPoints(String uid, int points);
+
+  /// Watch all users as a real-time stream (admin use).
+  Stream<List<AppUser>> watchAllUsers();
+
+  /// Add points to a user (alias for awardPoints, identified by phone).
+  Future<void> addPoints(String phoneOrUid, int points);
 }

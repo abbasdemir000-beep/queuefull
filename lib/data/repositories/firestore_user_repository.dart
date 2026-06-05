@@ -74,4 +74,23 @@ class FirestoreUserRepository implements UserRepository {
       'points': FieldValue.increment(points),
     });
   }
+
+  @override
+  Stream<List<AppUser>> watchAllUsers() {
+    return _collection.snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['uid'] = doc.id;
+        return AppUser.fromJson(data);
+      }).toList();
+    });
+  }
+
+  @override
+  Future<void> addPoints(String phoneOrUid, int points) async {
+    // Try to find by UID first, then by phone
+    await _collection.doc(phoneOrUid).update({
+      'points': FieldValue.increment(points),
+    });
+  }
 }

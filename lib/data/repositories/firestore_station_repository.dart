@@ -78,4 +78,14 @@ class FirestoreStationRepository implements StationRepository {
       'confirmedCount': FieldValue.increment(1),
     });
   }
+
+  @override
+  Future<void> approveStation(String stationId) async {
+    await _collection.doc(stationId).update({'isApproved': true});
+  }
+
+  @override
+  Future<void> deleteStation(String stationId) async {
+    await _collection.doc(stationId).delete();
+  }
 }
