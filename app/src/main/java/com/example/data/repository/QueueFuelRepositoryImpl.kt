@@ -15,6 +15,7 @@ import com.example.domain.model.City
 import com.example.domain.model.QueueUpdate
 import com.example.domain.model.Station
 import com.example.domain.repository.QueueFuelRepository
+import com.example.domain.usecase.AuthPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -354,7 +355,7 @@ class QueueFuelRepositoryImpl(context: Context) : QueueFuelRepository {
             // Insert default Admin user
             dao.insertUser(
                 AppUserEntity(
-                    phoneNumber = "07774564334",
+                    phoneNumber = AuthPolicy.ADMIN_PHONE,
                     name = "مدير المنصة (الأدمن)",
                     role = "ADMIN",
                     points = 250
