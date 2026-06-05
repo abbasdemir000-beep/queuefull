@@ -88,9 +88,44 @@ class FirestoreUserRepository implements UserRepository {
 
   @override
   Future<void> addPoints(String phoneOrUid, int points) async {
-    // Try to find by UID first, then by phone
-    await _collection.doc(phoneOrUid).update({
-      'points': FieldValue.increment(points),
-    });
+    // Determine if the identifier looks like a phone number.
+    // Firestore document IDs (UIDs) are typically 28-char alphanumeric strings,
+    // while phone numbers start with '+' or digits like '07'.
+    final isPhone = phoneOrUid.startsWith('+') ||
+        phoneOrUid.startsWith('0') ||
+        (phoneOrUid.isNotEmpty && !RegExp(r'^[a-zA-Z0-9]{20,}$').hasMatch(phoneOrUid));
+
+    if (isPhone) {
+      // Look up user by phone number field
+      final snapshot = await _collection
+          .where('phoneNumber', isEqualTo: phoneOrUid)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        await snapshot.docs.first.reference.update({
+          'points': FieldValue.increment(points),
+        });
+      }
+    } else {
+      // Treat as UID - direct document update
+      await _collection.doc(phoneOrUid).update({
+        'points': FieldValue.increment(points),
+      });
+    }
+  }
+
+  @override
+  Future<AppUser?> getUserByPhone(String phoneNumber) async {
+    final snapshot = await _collection
+        .where('phoneNumber', isEqualTo: phoneNumber)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+
+    final data = snapshot.docs.first.data();
+    data['uid'] = snapshot.docs.first.id;
+    return AppUser.fromJson(data);
   }
 }

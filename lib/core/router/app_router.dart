@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants/app_constants.dart';
+import '../../presentation/providers/auth_provider.dart';
 import '../../presentation/screens/admin/admin_cities_screen.dart';
 import '../../presentation/screens/admin/admin_panel_screen.dart';
 import '../../presentation/screens/admin/admin_stations_screen.dart';
@@ -33,20 +35,22 @@ class AppRoutes {
   static const String adminSuggestions = '/admin/suggestions';
 }
 
-/// Provider for auth state used by the router redirect logic.
-/// This will be overridden in the actual app with real auth state.
-final routerAuthStateProvider = StateProvider<bool>((ref) => false);
-
 /// GoRouter provider
 final routerProvider = Provider<GoRouter>((ref) {
-  final isLoggedIn = ref.watch(routerAuthStateProvider);
+  final authState = ref.watch(authStateProvider);
 
   return GoRouter(
     initialLocation: AppRoutes.splash,
     redirect: (BuildContext context, GoRouterState state) {
+      final isLoading = authState.isLoading;
+      final currentUser = authState.valueOrNull;
+      final isLoggedIn = currentUser != null;
       final isOnAuth = state.matchedLocation == AppRoutes.auth ||
           state.matchedLocation == AppRoutes.authOtp;
       final isOnSplash = state.matchedLocation == AppRoutes.splash;
+
+      // While auth state is loading, allow splash to show
+      if (isLoading && isOnSplash) return null;
 
       // Allow splash to show regardless
       if (isOnSplash) return null;
@@ -58,6 +62,12 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Logged in but on auth page - redirect to home
       if (isLoggedIn && isOnAuth) {
+        return AppRoutes.home;
+      }
+
+      // Admin route protection: only admin role can access /admin/* paths
+      final isAdminRoute = state.matchedLocation.startsWith('/admin');
+      if (isAdminRoute && isLoggedIn && currentUser.role != UserRole.admin) {
         return AppRoutes.home;
       }
 

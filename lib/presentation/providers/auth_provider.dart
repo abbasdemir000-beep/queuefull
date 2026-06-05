@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/repositories/firebase_auth_repository.dart';
 import '../../domain/models/app_user.dart';
 import 'repository_providers.dart';
 
@@ -63,10 +64,21 @@ class PhoneVerificationNotifier extends StateNotifier<PhoneVerificationState> {
     try {
       final authRepo = _ref.read(authRepositoryProvider);
       final verificationId = await authRepo.sendOtp(phoneNumber);
-      state = state.copyWith(
-        status: PhoneVerificationStatus.codeSent,
-        verificationId: verificationId,
-      );
+
+      // Check if Android auto-verified the SMS
+      if (verificationId == kAutoVerifiedSentinel) {
+        // User is already signed in - fetch current user and transition to verified
+        final user = await authRepo.getCurrentUser();
+        state = PhoneVerificationState(
+          status: PhoneVerificationStatus.verified,
+          user: user,
+        );
+      } else {
+        state = state.copyWith(
+          status: PhoneVerificationStatus.codeSent,
+          verificationId: verificationId,
+        );
+      }
     } catch (e) {
       state = PhoneVerificationState(
         status: PhoneVerificationStatus.error,

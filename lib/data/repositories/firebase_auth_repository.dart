@@ -7,6 +7,11 @@ import '../../core/constants/app_constants.dart';
 import '../../domain/models/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 
+/// Sentinel value returned by [sendOtp] when Android auto-verifies the SMS
+/// without user input. Callers should check for this value and skip the manual
+/// OTP entry screen.
+const String kAutoVerifiedSentinel = '__AUTO_VERIFIED__';
+
 /// Firebase implementation of [AuthRepository].
 /// Uses FirebaseAuth for phone OTP authentication and Firestore for user data.
 class FirebaseAuthRepository implements AuthRepository {
@@ -29,8 +34,11 @@ class FirebaseAuthRepository implements AuthRepository {
     await _auth.verifyPhoneNumber(
       phoneNumber: phoneNumber,
       verificationCompleted: (PhoneAuthCredential credential) async {
-        // Auto-verification on Android
+        // Auto-verification on Android - sign in and complete the future
         await _auth.signInWithCredential(credential);
+        if (!completer.isCompleted) {
+          completer.complete(kAutoVerifiedSentinel);
+        }
       },
       verificationFailed: (FirebaseAuthException e) {
         if (!completer.isCompleted) {
