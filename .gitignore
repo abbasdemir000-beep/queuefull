@@ -1,18 +1,60 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+.pub-cache/
+.pub/
+pubspec.lock
+
+# IDE
+.idea/
+.vscode/
 *.iml
-.gradle
-.kotlin
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+*.ipr
+*.iws
+
+# Android
+android/.gradle/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+**/android/**/GeneratedPluginRegistrant.java
+**/android/**/generated_plugin_registrant.dart
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.framework
+ios/Flutter/engine/
+ios/Flutter/flutter_export_environment.sh
+**/ios/**/GeneratedPluginRegistrant.m
+**/ios/**/Generated.xcconfig
+
+# Web
+lib/generated_plugin_registrant.dart
+
+# Generated files
+*.g.dart
+*.freezed.dart
+
+# Environment
 .env
-debug.keystore
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+
+# Firebase
+# Note: lib/firebase_options.dart placeholder is tracked.
+# When flutterfire configure regenerates it, the changes will show in git diff.

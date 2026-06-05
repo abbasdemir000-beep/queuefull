@@ -1,6 +1,0 @@
-{
-  "name": "QueueFuel",
-  "description": "تطبيق لتقليل ازدحام محطات البنزين في كركوك وأربيل والسليمانية عبر معرفة حالة السرا وتحديثها لحظياً من قبل المستخدمين.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
