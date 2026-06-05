@@ -37,6 +37,7 @@ import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 import android.widget.Toast
+import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 
@@ -53,6 +54,13 @@ enum class NavigationTab {
 fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
     val context = LocalContext.current
     var currentTab by remember { mutableStateOf(NavigationTab.MAP_STATIONS) }
+
+    // Collect toast events from ViewModel and show them in the UI layer
+    LaunchedEffect(Unit) {
+        viewModel.toastEvent.collectLatest { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // If not logged in, show beautiful dynamic login
     if (!viewModel.isLoggedIn) {

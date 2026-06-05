@@ -1,7 +1,6 @@
 package com.example.ui
 
 import android.app.Application
-import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -25,6 +24,10 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 class QueueFuelViewModel(application: Application) : AndroidViewModel(application) {
     
     private val repository: QueueFuelRepository = QueueFuelRepositoryImpl(application)
+
+    // Toast event channel — UI collects and shows Toast. Keeps VM free of android.widget.Toast.
+    private val _toastEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val toastEvent: SharedFlow<String> = _toastEvent.asSharedFlow()
 
     // Auth States
     var isLoggedIn by mutableStateOf(false)
@@ -760,7 +763,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun showToast(msg: String) {
-        Toast.makeText(getApplication(), msg, Toast.LENGTH_SHORT).show()
+        _toastEvent.tryEmit(msg)
     }
 }
 
