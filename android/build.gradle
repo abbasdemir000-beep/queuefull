@@ -1,0 +1,51 @@
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+ext.flutter = [
+    compileSdkVersion: 36,
+    minSdkVersion    : 24,
+    targetSdkVersion : 36,
+    versionCode      : 1,
+    versionName      : "1.0"
+]
+
+subprojects { subproject ->
+    subproject.plugins.withId("com.android.library") {
+        subproject.ext.flutter = rootProject.ext.flutter
+        subproject.extensions.configure("android") {
+            it.ext.flutter = rootProject.ext.flutter
+        }
+    }
+}
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                if (namespace == null) {
+                    namespace = project.group
+                }
+                compileSdk = 36
+                defaultConfig {
+                    targetSdk = 36
+                }
+            }
+        }
+    }
+}
+
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}

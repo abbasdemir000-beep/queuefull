@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "450639289776",
+    "project_id": "queue-6a58d",
+    "storage_bucket": "queue-6a58d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:450639289776:android:b8056e6c33a2375bc38a75",
+        "android_client_info": {
+          "package_name": "com.queuefuel.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxDO6J9sPaW33jN32ly4X1jOKh9ktHdGs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
