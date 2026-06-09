@@ -81,11 +81,11 @@ fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
                         icon = { Icon(Icons.Filled.Map, contentDescription = "المحطات") },
                         label = { Text("المحطات", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = CosmicDarkBlue,
-                            selectedTextColor = CosmicText,
-                            indicatorColor = CosmicLightBlue,
-                            unselectedIconColor = CosmicTextLight,
-                            unselectedTextColor = CosmicTextLight
+                            selectedIconColor = CosmicAccent,
+                            selectedTextColor = CosmicAccent,
+                            indicatorColor = CosmicAccent.copy(alpha = 0.18f),
+                            unselectedIconColor = CosmicTextGray,
+                            unselectedTextColor = CosmicTextGray
                         ),
                         modifier = Modifier.testTag("nav_stations")
                     )
@@ -96,11 +96,11 @@ fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
                         icon = { Icon(Icons.Filled.AddLocationAlt, contentDescription = "اقتراح") },
                         label = { Text("اقتراح", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = CosmicDarkBlue,
-                            selectedTextColor = CosmicText,
-                            indicatorColor = CosmicLightBlue,
-                            unselectedIconColor = CosmicTextLight,
-                            unselectedTextColor = CosmicTextLight
+                            selectedIconColor = CosmicAccent,
+                            selectedTextColor = CosmicAccent,
+                            indicatorColor = CosmicAccent.copy(alpha = 0.18f),
+                            unselectedIconColor = CosmicTextGray,
+                            unselectedTextColor = CosmicTextGray
                         ),
                         modifier = Modifier.testTag("nav_suggest")
                     )
@@ -108,7 +108,7 @@ fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
                     NavigationBarItem(
                         selected = currentTab == NavigationTab.ALERTS,
                         onClick = { currentTab = NavigationTab.ALERTS },
-                        icon = { 
+                        icon = {
                             BadgedBox(badge = {
                                 val notifs = viewModel.notifications.collectAsState().value
                                 if (notifs.isNotEmpty()) {
@@ -120,16 +120,16 @@ fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
                         },
                         label = { Text("التنبيهات", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = CosmicDarkBlue,
-                            selectedTextColor = CosmicText,
-                            indicatorColor = CosmicLightBlue,
-                            unselectedIconColor = CosmicTextLight,
-                            unselectedTextColor = CosmicTextLight
+                            selectedIconColor = CosmicAccent,
+                            selectedTextColor = CosmicAccent,
+                            indicatorColor = CosmicAccent.copy(alpha = 0.18f),
+                            unselectedIconColor = CosmicTextGray,
+                            unselectedTextColor = CosmicTextGray
                         ),
                         modifier = Modifier.testTag("nav_alerts")
                     )
 
-                    // Show Admin tab only for ADMIN or REPORTER (Simple Admin)
+                    // Admin tab only visible to the designated admin phone
                     if (role == "ADMIN") {
                         NavigationBarItem(
                             selected = currentTab == NavigationTab.ADMIN_PANEL,
@@ -137,11 +137,11 @@ fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
                             icon = { Icon(Icons.Filled.AdminPanelSettings, contentDescription = "الأدمن") },
                             label = { Text("الأدمن", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = CosmicDarkBlue,
-                                selectedTextColor = CosmicText,
-                                indicatorColor = CosmicLightBlue,
-                                unselectedIconColor = CosmicTextLight,
-                                unselectedTextColor = CosmicTextLight
+                                selectedIconColor = CosmicAmber,
+                                selectedTextColor = CosmicAmber,
+                                indicatorColor = CosmicAmber.copy(alpha = 0.18f),
+                                unselectedIconColor = CosmicTextGray,
+                                unselectedTextColor = CosmicTextGray
                             ),
                             modifier = Modifier.testTag("nav_admin")
                         )
@@ -153,11 +153,11 @@ fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
                         icon = { Icon(Icons.Filled.Person, contentDescription = "الملف الشخصي") },
                         label = { Text("حسابي", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = CosmicDarkBlue,
-                            selectedTextColor = CosmicText,
-                            indicatorColor = CosmicLightBlue,
-                            unselectedIconColor = CosmicTextLight,
-                            unselectedTextColor = CosmicTextLight
+                            selectedIconColor = CosmicAccent,
+                            selectedTextColor = CosmicAccent,
+                            indicatorColor = CosmicAccent.copy(alpha = 0.18f),
+                            unselectedIconColor = CosmicTextGray,
+                            unselectedTextColor = CosmicTextGray
                         ),
                         modifier = Modifier.testTag("nav_profile")
                     )
@@ -337,17 +337,18 @@ fun LoginScreen(viewModel: QueueFuelViewModel) {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Cool display warning of OTP
+                        // Simulated OTP display
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color(0xFFFFEDD5), RoundedCornerShape(8.dp))
-                                .padding(8.dp)
+                                .background(CosmicAmber.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .border(1.dp, CosmicAmber.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .padding(10.dp)
                         ) {
                             Text(
                                 text = "محاكاة الرمز: أدخل الرمز الظاهر لتسجيل الدخول السريع: ${viewModel.simulatedOtp}",
                                 fontSize = 12.sp,
-                                color = Color(0xFFC2410C),
+                                color = CosmicAmber,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center
@@ -759,7 +760,7 @@ fun InteractiveMapCanvas(
                 }
 
                 // 2. Draw mock futuristic roads
-                val roadColor = Color(0xFFE2E8F0)
+                val roadColor = Color(0xFF2E2820)
                 drawLine(
                     color = roadColor,
                     start = Offset(0f, canvasHeight * 0.4f),
@@ -1033,7 +1034,7 @@ fun BannerAdCard(ad: AdBanner) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .testTag("ad_banner_card"),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+        colors = CardDefaults.cardColors(containerColor = CosmicSurface),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, CosmicAccent.copy(alpha = 0.4f))
     ) {
@@ -1414,13 +1415,14 @@ fun StationDetailBottomSheet(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFFFEF2F2), RoundedCornerShape(10.dp))
+                            .background(FuelRed.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+                            .border(1.dp, FuelRed.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
                             .padding(12.dp)
                     ) {
                         Text(
                             text = "⚠️ تنبيه المسافة الجغرافية:\nأنت تبعد مسافة قدرها ${"%.0f".format(mockDistance)} متر من هذه المحطة. لا يمكنك تحديث السرا إلا عند وجودك على بعد أقل من 200م لمنع البلاغات الكاذبة. (فعل 'محاكاة GPS' لمحاكاة التواجد)",
                             fontSize = 11.sp,
-                            color = Color(0xFF991B1B),
+                            color = FuelRed,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Right,
                             modifier = Modifier.fillMaxWidth()
@@ -1430,7 +1432,8 @@ fun StationDetailBottomSheet(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFFECFDF5), RoundedCornerShape(10.dp))
+                            .background(FuelGreen.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+                            .border(1.dp, FuelGreen.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
                             .padding(12.dp)
                     ) {
                         Text(
@@ -1876,12 +1879,13 @@ fun SuggestionsAndClaims(viewModel: QueueFuelViewModel) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 8.dp)
-                                .background(Color(0xFFFEF2F2), RoundedCornerShape(8.dp))
+                                .background(FuelRed.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .border(1.dp, FuelRed.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
                                 .padding(8.dp)
                         ) {
                             Text(
                                 text = "⚠️ تحذير تكرار: تقع هذه المحطة المقترحة على بعد أقل من 100 متر من محطة مدرجة مسبقاً! إذا قمت بإرسالها، سيقوم الأدمن بدمجها مع المحطة الحالية تلقائياً.",
-                                color = Color(0xFF991B1B),
+                                color = FuelRed,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Right,
@@ -2254,7 +2258,7 @@ fun AdminDashboardPanel(viewModel: QueueFuelViewModel) {
                 ) {
                     Button(
                         onClick = { viewModel.resetCycleAction() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        colors = ButtonDefaults.buttonColors(containerColor = FuelRed),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f).height(36.dp),
                         contentPadding = PaddingValues(0.dp)
@@ -2466,13 +2470,14 @@ fun AdminStationRequestCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 // Suggest merging option
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+                    colors = CardDefaults.cardColors(containerColor = FuelRed.copy(alpha = 0.10f)),
+                    border = BorderStroke(1.dp, FuelRed.copy(alpha = 0.35f)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Column(modifier = Modifier.padding(8.dp)) {
                         Text(
                             text = "⚠️ تنبيه تكرار المحطة:\nتم كشف محطة قريبة جداً معتمدة مسبقاً (${nearStations.first().name}) تبعد ${"%.0f".format(viewModel.calculateDistance(station.latitude, station.longitude, nearStations.first().latitude, nearStations.first().longitude))}م. يوصى بـ دمج المحطة لتجنب العشوائية.",
-                            color = Color(0xFF991B1B),
+                            color = FuelRed,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Right,
@@ -2483,7 +2488,7 @@ fun AdminStationRequestCard(
                         
                         Button(
                             onClick = { viewModel.adminMergeStation(station.id, nearStations.first().id) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                            colors = ButtonDefaults.buttonColors(containerColor = FuelRed),
                             shape = RoundedCornerShape(6.dp),
                             modifier = Modifier.align(Alignment.End).height(28.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
@@ -2651,7 +2656,7 @@ fun AdminUserBlockCard(
                 if (!user.banned) {
                     Button(
                         onClick = { viewModel.adminBanUser(user.phoneNumber) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        colors = ButtonDefaults.buttonColors(containerColor = FuelRed),
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                         modifier = Modifier.height(32.dp)
@@ -2815,17 +2820,19 @@ fun MyProfileScreen(viewModel: QueueFuelViewModel) {
                         Text("مراسل ثان", fontSize = 10.sp)
                     }
 
-                    Button(
-                        onClick = { viewModel.switchRole("ADMIN") },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (user.role == "ADMIN") CosmicAmber else CosmicBorder,
-                            contentColor = if (user.role == "ADMIN") Color.Black else CosmicText
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        modifier = Modifier.height(34.dp)
-                    ) {
-                        Text("أدمن مشرف 👮‍♀️", fontSize = 10.sp)
+                    if (AuthPolicy.isAdminPhone(user.phoneNumber)) {
+                        Button(
+                            onClick = { viewModel.switchRole("ADMIN") },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (user.role == "ADMIN") CosmicAmber else CosmicBorder,
+                                contentColor = if (user.role == "ADMIN") Color.Black else CosmicText
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text("أدمن مشرف 👮‍♀️", fontSize = 10.sp)
+                        }
                     }
                 }
             }
@@ -2981,7 +2988,7 @@ fun FeedbackRewardDialog(viewModel: QueueFuelViewModel) {
                         onClick = {
                             viewModel.resetCycleAction()
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        colors = ButtonDefaults.buttonColors(containerColor = FuelRed),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {

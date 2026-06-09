@@ -10,25 +10,30 @@ val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 
-// QueueFuel Brand Palette (Clean Minimalism Style)
-val FuelGreen = Color(0xFF10B981)       // فارغة
-val FuelShortGreen = Color(0xFF34D399)  // قصيرة
-val FuelYellow = Color(0xFFF59E0B)      // معتدلة
-val FuelRed = Color(0xFFEF4444)         // طويلة
-val FuelClosed = Color(0xFF6B7280)      // مغلقة / لا يوجد بنزين
+// QueueFuel — Dark Automotive Theme
+// Status indicator colors (semantic, high-contrast on dark)
+val FuelGreen = Color(0xFF22C55E)        // فارغة — empty, green
+val FuelShortGreen = Color(0xFF4ADE80)   // قصيرة — short, light green
+val FuelYellow = Color(0xFFFCD34D)       // معتدلة — moderate, amber-yellow
+val FuelRed = Color(0xFFF87171)          // طويلة — long, red
+val FuelClosed = Color(0xFF6B7280)       // مغلقة — closed, gray
 
-val CosmicBackground = Color(0xFFFDFCFB) // Clean warm white background (#FDFCFB)
-val CosmicSurface = Color(0xFFFFFFFF)    // Pure white surface sheets
-val CosmicAccent = Color(0xFF0061A4)     // Deep clean brand blue (#0061A4)
-val CosmicAmber = Color(0xFFD97706)      // Dark gold amber
-val CosmicTeal = Color(0xFF0D9488)       // Station info highlights
+// Dark background layers — warmth of engine metal at night
+val CosmicBackground = Color(0xFF0E0C0A)  // Near-black warm charcoal
+val CosmicSurface = Color(0xFF1C1814)     // Card / sheet surface
+val CosmicSecondaryBg = Color(0xFF242018) // Inputs, chips, secondary panels
+val CosmicBorder = Color(0xFF332C22)      // Warm dark divider
 
-// Light/Minimalist utility helper colors for text and UI containers
-val CosmicText = Color(0xFF191C1E)       // Dark active gray/black text (#191C1E)
-val CosmicTextLight = Color(0xFF44474E)  // Secondary text (#44474E)
-val CosmicTextGray = Color(0xFF74777F)   // Muted tertiary text/placeholder (#74777F)
-val CosmicBorder = Color(0xFFE1E2E4)     // Thin clean line color (#E1E2E4)
-val CosmicLightBlue = Color(0xFFD3E4FF)   // Highlight indicator (#D3E4FF)
-val CosmicDarkBlue = Color(0xFF001C38)    // Contrast dark color (#001C38)
-val CosmicSecondaryBg = Color(0xFFF3F4F9) // Light gray secondary/badge bg (#F3F4F9)
+// Brand accent — fuel-fire amber orange
+val CosmicAccent = Color(0xFFE8760C)      // Primary action / highlight
+val CosmicAmber = Color(0xFFF0B030)       // Gold — points, badges, timers
+val CosmicTeal = Color(0xFFE8760C)        // Alias for accent (CTA buttons)
 
+// Text hierarchy on dark backgrounds
+val CosmicText = Color(0xFFF0E4CC)        // Primary — warm off-white
+val CosmicTextLight = Color(0xFFB5987E)   // Secondary — warm mid-gray
+val CosmicTextGray = Color(0xFF7A6456)    // Tertiary — muted warm
+
+// Material3 container helpers
+val CosmicLightBlue = Color(0xFF3D2B0F)   // primaryContainer (dark amber tint)
+val CosmicDarkBlue = Color(0xFFF0B030)    // onPrimaryContainer (gold on dark amber)
