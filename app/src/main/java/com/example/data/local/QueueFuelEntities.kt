@@ -70,5 +70,9 @@ data class AppUserEntity(
     val name: String,
     val role: String = "USER",
     val points: Int = 0,
-    val banned: Boolean = false
+    val banned: Boolean = false,
+    val lifetimePoints: Int = 0,
+    val monthlyPoints: Int = 0,
+    val accountType: String = "FREE",
+    val premiumUntil: Long? = null
 )

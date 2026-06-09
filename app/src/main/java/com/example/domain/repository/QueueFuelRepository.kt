@@ -3,22 +3,14 @@ package com.example.domain.repository
 import com.example.domain.model.AdBanner
 import com.example.domain.model.AppUser
 import com.example.domain.model.City
+import com.example.domain.model.LeaderboardEntry
 import com.example.domain.model.QueueUpdate
+import com.example.domain.model.ReportConfidence
+import com.example.domain.model.RewardEntry
 import com.example.domain.model.Station
+import com.example.domain.model.UserBadge
 import kotlinx.coroutines.flow.Flow
 
-/**
- * Abstraction over the QueueFuel data layer.
- *
- * The presentation layer (ViewModels) depends on this interface only, never on a
- * concrete implementation. Today the single implementation is Room-backed
- * ([com.example.data.repository.QueueFuelRepositoryImpl]); tomorrow a remote- or
- * cache-backed implementation can be swapped in without touching callers. All
- * types crossing this boundary are pure domain models.
- *
- * Note: this PR is a structural extraction only. The method surface mirrors the
- * previous concrete repository exactly to guarantee identical behavior.
- */
 interface QueueFuelRepository {
 
     // ---- Observable streams ----
@@ -47,6 +39,7 @@ interface QueueFuelRepository {
     // ---- Queue updates ----
     suspend fun insertQueueUpdate(update: QueueUpdate)
     suspend fun confirmQueueStatus(stationId: Int, userPhone: String)
+    suspend fun getLatestUpdateForStation(stationId: Int): QueueUpdate?
 
     // ---- Users / rewards ----
     suspend fun rewardUserPoints(phone: String, pointsToAdd: Int)
@@ -57,4 +50,23 @@ interface QueueFuelRepository {
     // ---- Banners ----
     suspend fun insertBanner(banner: AdBanner)
     suspend fun deleteBanner(id: Int)
+
+    // ---- Leaderboard ----
+    suspend fun getLeaderboard(): List<LeaderboardEntry>
+    suspend fun resetMonthlyPoints()
+
+    // ---- Badges ----
+    suspend fun getBadgesForUser(phone: String): List<UserBadge>
+    suspend fun awardBadge(badge: UserBadge)
+
+    // ---- Reward pool ----
+    suspend fun createRewardEntry(entry: RewardEntry)
+    suspend fun getRewardEntriesForMonth(monthYear: String): List<RewardEntry>
+    suspend fun markRewardEntryVerified(entryId: Int)
+
+    // ---- Report confidence ----
+    suspend fun upsertReportConfidence(confidence: ReportConfidence)
+    suspend fun getConfidenceForStation(stationId: Int): ReportConfidence?
+    suspend fun confirmReportConfidence(stationId: Int, newScore: Float)
+    suspend fun expireOldConfidences(now: Long)
 }

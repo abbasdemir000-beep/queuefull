@@ -364,16 +364,15 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
         simulatedOtp = ""
     }
 
-    // Role switching (For immediate dual testing)
+    // Role switching (dev testing only — ADMIN role gated to admin phone)
     fun switchRole(newRole: String) {
-        val current = currentUser
-        if (current != null) {
-            val updated = current.copy(role = newRole)
-            currentUser = updated
-            viewModelScope.launch {
-                repository.insertUser(updated)
-                showToast("تم التبديل إلى صلاحية: $newRole")
-            }
+        val current = currentUser ?: return
+        if (newRole == "ADMIN" && !AuthPolicy.isAdminPhone(current.phoneNumber)) return
+        val updated = current.copy(role = newRole)
+        currentUser = updated
+        viewModelScope.launch {
+            repository.insertUser(updated)
+            showToast("تم التبديل إلى صلاحية: $newRole")
         }
     }
 

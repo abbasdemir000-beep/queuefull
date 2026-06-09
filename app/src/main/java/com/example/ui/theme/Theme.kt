@@ -11,30 +11,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 
-private val CleanMinimalColorScheme = lightColorScheme(
+private val DarkAutomotiveScheme = darkColorScheme(
     primary = CosmicAccent,
-    onPrimary = Color.White,
+    onPrimary = Color.Black,
     primaryContainer = CosmicLightBlue,
     onPrimaryContainer = CosmicDarkBlue,
+    secondary = CosmicAmber,
+    onSecondary = Color.Black,
     background = CosmicBackground,
     onBackground = CosmicText,
     surface = CosmicSurface,
     onSurface = CosmicText,
     surfaceVariant = CosmicSecondaryBg,
     onSurfaceVariant = CosmicTextLight,
-    outline = CosmicBorder
+    outline = CosmicBorder,
+    error = FuelRed,
+    onError = Color.Black
 )
 
 @Composable
 fun MyApplicationTheme(
-  darkTheme: Boolean = isSystemInDarkTheme(),
-  // Dynamic color is available on Android 12+
-  dynamicColor: Boolean = false, // Set to false to enforce the strict Clean Minimalism branding
-  content: @Composable () -> Unit,
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = false,
+    content: @Composable () -> Unit,
 ) {
-  // Enforce Clean Minimalism color scheme consistently
-  val colorScheme = CleanMinimalColorScheme
-
-  MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+    MaterialTheme(colorScheme = DarkAutomotiveScheme, typography = Typography, content = content)
 }
-
