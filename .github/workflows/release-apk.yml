@@ -33,7 +33,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          validate-wrappers: false
+          gradle-version: '9.3.1'
 
       - name: Decode release keystore
         run: base64 -d release.keystore.base64 > release.keystore
@@ -43,7 +43,7 @@ jobs:
           KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
           STORE_PASSWORD: android123
           KEY_PASSWORD: android123
-        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
 
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
