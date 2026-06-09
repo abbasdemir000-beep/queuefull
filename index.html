@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QueueFuel | اعرف زحمة محطة الوقود قبل لا تطلع</title>
+  <meta name="description" content="QueueFuel — تطبيق أندرويد مجتمعي لمعرفة حالة طوابير محطات الوقود في كركوك وأربيل والسليمانية بتحديثات فورية من المستخدمين." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --amber:   #f0b030;
+      --orange:  #e8760c;
+      --bg:      #0b0908;
+      --surface: #141210;
+      --card:    #191512;
+      --border:  rgba(255,255,255,.08);
+      --border-amber: rgba(240,176,48,.22);
+      --text:    #fff;
+      --muted:   #b8b0a6;
+      --radius:  24px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: "Cairo", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.8;
+      overflow-x: hidden;
+    }
+
+    /* ── Utility ── */
+    .container { max-width: 1160px; margin: auto; padding: 0 24px; }
+
+    .btn {
+      background: linear-gradient(135deg, var(--orange), var(--amber));
+      color: #111;
+      padding: 13px 28px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 800;
+      font-family: "Cairo", sans-serif;
+      font-size: 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 0;
+      cursor: pointer;
+      transition: opacity .2s, transform .15s;
+      box-shadow: 0 6px 28px rgba(232,118,12,.35);
+    }
+    .btn:hover { opacity: .9; transform: translateY(-2px); }
+
+    .section-label {
+      display: inline-block;
+      background: rgba(240,176,48,.12);
+      color: var(--amber);
+      border: 1px solid var(--border-amber);
+      padding: 5px 18px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      letter-spacing: .04em;
+    }
+
+    .title {
+      font-size: 36px;
+      font-weight: 800;
+      margin-bottom: 10px;
+      line-height: 1.3;
+    }
+    .title span { color: var(--amber); }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 18px;
+      margin-bottom: 32px;
+      max-width: 580px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: rgba(11,9,8,.92);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(14px);
+    }
+
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 0;
+    }
+
+    .logo {
+      font-size: 26px;
+      font-weight: 900;
+      color: var(--amber);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo i { color: var(--orange); font-size: 22px; }
+    .logo span { color: var(--orange); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .nav-links a {
+      color: #ccc;
+      text-decoration: none;
+      font-weight: 700;
+      padding: 7px 14px;
+      border-radius: 999px;
+      transition: color .2s, background .2s;
+      font-size: 15px;
+    }
+    .nav-links a:hover { color: var(--amber); background: rgba(240,176,48,.08); }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 80px 0 60px;
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(232,118,12,.1);
+      border: 1px solid rgba(232,118,12,.3);
+      color: var(--orange);
+      padding: 7px 18px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+    .hero-badge .dot {
+      width: 8px; height: 8px;
+      background: var(--orange);
+      border-radius: 50%;
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: .5; transform: scale(1.4); }
+    }
+
+    .hero h1 {
+      font-size: 50px;
+      font-weight: 900;
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+    .hero h1 span { color: var(--amber); }
+
+    .hero-meta {
+      display: flex;
+      gap: 24px;
+      margin-top: 28px;
+    }
+    .hero-stat strong { display: block; font-size: 26px; color: var(--amber); font-weight: 800; }
+    .hero-stat span  { font-size: 13px; color: var(--muted); }
+
+    /* ── Phone mockup ── */
+    .phone {
+      background: linear-gradient(160deg, #1e1a15, #0c0a08);
+      border: 1px solid rgba(240,176,48,.22);
+      border-radius: 36px;
+      padding: 22px 18px;
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,.8),
+        0 30px 90px rgba(232,118,12,.22),
+        0 0 60px rgba(0,0,0,.6);
+      position: relative;
+      overflow: hidden;
+    }
+    .phone::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 70% 45% at 50% 0%, rgba(240,176,48,.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .phone-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .phone-topbar .app-name { font-weight: 800; font-size: 17px; color: var(--amber); }
+    .phone-topbar .city-sel {
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .station-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 14px 16px;
+      border-radius: 18px;
+      margin-bottom: 12px;
+      transition: border-color .2s;
+    }
+    .station-card:last-child { margin-bottom: 0; }
+    .station-card:hover { border-color: var(--border-amber); }
+
+    .station-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .station-name { font-weight: 700; font-size: 15px; }
+
+    .tag {
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .tag-empty  { background: #0f2e1a; color: #4dd886; border: 1px solid #1a4d2c; }
+    .tag-medium { background: #2e220a; color: #ffc948; border: 1px solid #4a380f; }
+    .tag-busy   { background: #2e0f0f; color: #ff6b6b; border: 1px solid #4d1616; }
+
+    .station-meta {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 12px;
+      color: #7a7068;
+    }
+    .station-meta i { font-size: 11px; }
+
+    .trust-bar-wrap {
+      background: rgba(255,255,255,.06);
+      border-radius: 4px;
+      height: 4px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .trust-bar {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--orange), var(--amber));
+    }
+
+    /* ── Sections ── */
+    section { padding: 60px 0; }
+
+    /* ── Feature cards ── */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .feature-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      transition: border-color .25s, transform .2s;
+    }
+    .feature-card:hover {
+      border-color: var(--border-amber);
+      transform: translateY(-3px);
+    }
+
+    .feat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: rgba(240,176,48,.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: var(--amber);
+      margin-bottom: 16px;
+    }
+
+    .feature-card h3 { font-size: 18px; color: var(--amber); margin-bottom: 8px; font-weight: 800; }
+    .feature-card p  { color: var(--muted); font-size: 15px; line-height: 1.7; }
+
+    /* ── Points / Rewards ── */
+    .rewards-box {
+      background: linear-gradient(140deg, #1c1711, #261a0d);
+      border: 1px solid rgba(232,118,12,.28);
+      border-radius: 32px;
+      padding: 40px 36px;
+      position: relative;
+      overflow: hidden;
+    }
+    .rewards-box::after {
+      content: "";
+      position: absolute;
+      top: -80px; left: -80px;
+      width: 320px; height: 320px;
+      background: radial-gradient(circle, rgba(240,176,48,.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .rewards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .reward-card {
+      background: rgba(0,0,0,.3);
+      border: 1px solid rgba(240,176,48,.14);
+      border-radius: 20px;
+      padding: 22px 20px;
+      text-align: center;
+    }
+    .reward-card .reward-icon { font-size: 32px; margin-bottom: 10px; }
+    .reward-card h4 { color: var(--amber); font-size: 16px; font-weight: 800; margin-bottom: 6px; }
+    .reward-card p  { color: var(--muted); font-size: 14px; }
+
+    .points-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .point-pill {
+      background: rgba(240,176,48,.1);
+      border: 1px solid var(--border-amber);
+      color: var(--amber);
+      padding: 8px 18px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ── Leaderboard ── */
+    .leaderboard {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-top: 28px;
+    }
+    .lb-header {
+      background: rgba(240,176,48,.07);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 22px;
+      font-weight: 800;
+      color: var(--amber);
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .lb-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 22px;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      font-size: 15px;
+    }
+    .lb-row:last-child { border-bottom: none; }
+    .lb-rank {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .rank-1 { background: linear-gradient(135deg,#f0b030,#e8760c); color: #111; }
+    .rank-2 { background: #2a2a2a; color: #c0c0c0; }
+    .rank-3 { background: #231a0e; color: #cd7f32; }
+    .lb-name { flex: 1; font-weight: 700; }
+    .lb-city { font-size: 13px; color: var(--muted); }
+    .lb-pts  { font-weight: 800; color: var(--amber); }
+
+    /* ── Partners / Services ── */
+    .services-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 8px;
+    }
+    .service-pill {
+      background: var(--card);
+      border: 1px solid var(--border-amber);
+      padding: 10px 22px;
+      border-radius: 999px;
+      color: var(--amber);
+      font-weight: 800;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background .2s;
+    }
+    .service-pill:hover { background: rgba(240,176,48,.1); }
+
+    /* ── CTA ── */
+    .cta-box {
+      background: linear-gradient(135deg, var(--orange), var(--amber));
+      border-radius: 36px;
+      padding: 56px 32px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .cta-box::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
+      pointer-events: none;
+    }
+    .cta-box h2 { font-size: 38px; color: #111; font-weight: 900; margin-bottom: 12px; position: relative; }
+    .cta-box p  { font-size: 18px; color: rgba(0,0,0,.65); margin-bottom: 28px; position: relative; }
+    .btn-dark {
+      background: #111;
+      color: var(--amber);
+      box-shadow: 0 6px 28px rgba(0,0,0,.35);
+    }
+    .btn-dark:hover { background: #1a1612; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 36px 0 28px;
+    }
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .footer-copy { color: var(--muted); font-size: 14px; }
+    .footer-links { display: flex; gap: 20px; }
+    .footer-links a { color: var(--muted); text-decoration: none; font-size: 14px; transition: color .2s; }
+    .footer-links a:hover { color: var(--amber); }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-amber), transparent);
+      margin: 0;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 880px) {
+      .hero { grid-template-columns: 1fr; padding: 50px 0 40px; }
+      .hero h1 { font-size: 36px; }
+      .grid-3 { grid-template-columns: 1fr; }
+      .rewards-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .title { font-size: 28px; }
+      .hero h1 { font-size: 30px; }
+      .cta-box h2 { font-size: 26px; }
+      .rewards-box { padding: 28px 18px; }
+      .footer-inner { flex-direction: column; align-items: center; text-align: center; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ════════════ HEADER ════════════ -->
+<header>
+  <div class="container">
+    <nav>
+      <a class="logo" href="#">
+        <i class="fa-solid fa-gas-pump"></i>
+        Queue<span>Fuel</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">الميزات</a>
+        <a href="#rewards">النقاط</a>
+        <a href="#partners">الشركاء</a>
+        <a href="#cta" class="btn" style="padding:9px 20px; font-size:14px;">قريباً على Android</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<!-- ════════════ HERO ════════════ -->
+<section style="padding:0;">
+  <div class="container hero">
+
+    <!-- Left: Copy -->
+    <div>
+      <div class="hero-badge">
+        <span class="dot"></span>
+        مباشر الآن — كركوك · أربيل · السليمانية
+      </div>
+
+      <h1>اعرف زحمة محطة الوقود <span>قبل لا تطلع.</span></h1>
+
+      <p style="color:var(--muted);font-size:19px;margin-bottom:28px;max-width:500px;">
+        QueueFuel يرسلك تقارير حقيقية من مستخدمين قدام المحطة.
+        GPS، صور، ونظام ثقة يخليك تعرف الوضع قبل لا تتحرك.
+      </p>
+
+      <div style="display:flex;gap:14px;flex-wrap:wrap;">
+        <a class="btn" href="#cta">
+          <i class="fa-brands fa-android"></i>
+          قريباً على Android
+        </a>
+        <a class="btn" href="#features" style="background:transparent;color:var(--amber);border:1px solid var(--border-amber);box-shadow:none;">
+          كيف يشتغل؟
+          <i class="fa-solid fa-arrow-left" style="font-size:13px;"></i>
+        </a>
+      </div>
+
+      <div class="hero-meta">
+        <div class="hero-stat">
+          <strong>٣ مدن</strong>
+          <span>كركوك · أربيل · السليمانية</span>
+        </div>
+        <div class="hero-stat">
+          <strong>+٢٤٠</strong>
+          <span>محطة مسجلة</span>
+        </div>
+        <div class="hero-stat">
+          <strong>فوري</strong>
+          <span>تحديث كل دقائق</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Phone mockup -->
+    <div class="phone">
+      <div class="phone-topbar">
+        <span class="app-name"><i class="fa-solid fa-gas-pump" style="color:var(--orange);"></i> QueueFuel</span>
+        <span class="city-sel"><i class="fa-solid fa-location-dot"></i> كركوك</span>
+      </div>
+
+      <!-- Station 1 -->
+      <div class="station-card">
+        <div class="station-row">
+          <span class="station-name">محطة كركوك الرئيسية</span>
+          <span class="tag tag-busy"><i class="fa-solid fa-fire"></i> مزدحمة</span>
+        </div>
+        <div class="station-meta">
+          <span><i class="fa-regular fa-clock"></i> قبل ٤ دقائق</span>
+          <span><i class="fa-solid fa-shield-halved"></i> ثقة ٩٤٪</span>
+        </div>
+        <div class="trust-bar-wrap"><div class="trust-bar" style="width:94%;"></div></div>
+      </div>
+
+      <!-- Station 2 -->
+      <div class="station-card">
+        <div class="station-row">
+          <span class="station-name">محطة أربيل الغربية</span>
+          <span class="tag tag-medium"><i class="fa-solid fa-circle-half-stroke"></i> متوسطة</span>
+        </div>
+        <div class="station-meta">
+          <span><i class="fa-regular fa-clock"></i> قبل ١١ دقيقة</span>
+          <span><i class="fa-solid fa-shield-halved"></i> ثقة ٨٨٪</span>
+        </div>
+        <div class="trust-bar-wrap"><div class="trust-bar" style="width:88%;background:linear-gradient(90deg,#c87c00,#ffc948);"></div></div>
+      </div>
+
+      <!-- Station 3 -->
+      <div class="station-card">
+        <div class="station-row">
+          <span class="station-name">محطة السليمانية الجديدة</span>
+          <span class="tag tag-empty"><i class="fa-solid fa-check"></i> فارغة</span>
+        </div>
+        <div class="station-meta">
+          <span><i class="fa-regular fa-clock"></i> قبل ٧ دقائق</span>
+          <span><i class="fa-solid fa-shield-halved"></i> ثقة ٩١٪</span>
+        </div>
+        <div class="trust-bar-wrap"><div class="trust-bar" style="width:91%;background:linear-gradient(90deg,#1a7a3a,#4dd886);"></div></div>
+      </div>
+
+      <!-- Station 4 -->
+      <div class="station-card">
+        <div class="station-row">
+          <span class="station-name">محطة كركوك الشمالية</span>
+          <span class="tag tag-medium"><i class="fa-solid fa-circle-half-stroke"></i> متوسطة</span>
+        </div>
+        <div class="station-meta">
+          <span><i class="fa-regular fa-clock"></i> قبل ٢ دقيقة</span>
+          <span><i class="fa-solid fa-shield-halved"></i> ثقة ٩٧٪</span>
+        </div>
+        <div class="trust-bar-wrap"><div class="trust-bar" style="width:97%;background:linear-gradient(90deg,#c87c00,#ffc948);"></div></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ════════════ FEATURES ════════════ -->
+<section id="features">
+  <div class="container">
+    <div class="section-label"><i class="fa-solid fa-star"></i> كيف يشتغل؟</div>
+    <h2 class="title">الحل <span>الذكي</span> للزحمة</h2>
+    <p class="subtitle">ست ميزات أساسية تضمن لك معلومة دقيقة قبل لا تتحرك من البيت.</p>
+
+    <div class="grid-3">
+      <div class="feature-card">
+        <div class="feat-icon"><i class="fa-solid fa-location-crosshairs"></i></div>
+        <h3>تحقق بالـ GPS</h3>
+        <p>التقرير يُقبل فقط إذا المستخدم على بعد ٢٠٠ متر أو أقل من المحطة، ما يصير تبليغ كاذب من البيت.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feat-icon"><i class="fa-solid fa-camera"></i></div>
+        <h3>صورة توثيق</h3>
+        <p>رفع صورة حية من الطابور يرفع درجة الثقة ويعطي المستخدم نقاط إضافية.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feat-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <h3>نظام الثقة</h3>
+        <p>كل تقرير يبدأ بثقة مرتفعة وتنخفض تدريجياً مع الوقت — الأحدث دائماً الأدق.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feat-icon"><i class="fa-solid fa-thumbs-up"></i></div>
+        <h3>تأكيد جماعي</h3>
+        <p>إذا مستخدمين ثانيين أكّدوا نفس التقرير، تزيد نسبة الثقة ويأخذون نقاط تأكيد.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feat-icon"><i class="fa-solid fa-bell"></i></div>
+        <h3>إشعارات ذكية</h3>
+        <p>فعّل إشعار لمحطة معينة وخليها تخبرك لما تفرغ أو تزدحم.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feat-icon"><i class="fa-solid fa-map-location-dot"></i></div>
+        <h3>خريطة حية</h3>
+        <p>شوف كل المحطات في مدينتك على خريطة ملوّنة حسب الحالة — أحمر، أصفر، أخضر.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ════════════ REWARDS / POINTS ════════════ -->
+<section id="rewards">
+  <div class="container">
+    <div class="section-label"><i class="fa-solid fa-trophy"></i> نقاط ومكافآت</div>
+    <h2 class="title">ليش المستخدمين <span>يبلّغون؟</span></h2>
+    <p class="subtitle">نظام نقاط يحفّز الجميع على المساهمة ويكافئ الأكثر دقة ونشاطاً.</p>
+
+    <div class="rewards-box">
+      <div class="rewards-grid">
+        <div class="reward-card">
+          <div class="reward-icon">🏅</div>
+          <h4>نقاط مكتسبة</h4>
+          <p>تقرير صحيح <strong style="color:var(--amber);">+١٥</strong>، تأكيد تقرير <strong style="color:var(--amber);">+٥</strong>، صورة موثقة <strong style="color:var(--amber);">+١٠</strong></p>
+        </div>
+        <div class="reward-card">
+          <div class="reward-icon">🎖️</div>
+          <h4>Badges الشرف</h4>
+          <p>Reporter · Trusted · Elite · Legend — اكسب وسامك بالنشاط والدقة</p>
+        </div>
+        <div class="reward-card">
+          <div class="reward-icon">🎁</div>
+          <h4>جوائز شهرية</h4>
+          <p>مستقبلاً: زيت محرك، بطارية، غسيل سيارة، وكارت وقود</p>
+        </div>
+      </div>
+
+      <div class="points-row">
+        <div class="point-pill"><i class="fa-solid fa-plus"></i> تقرير جديد: +١٥ نقطة</div>
+        <div class="point-pill"><i class="fa-solid fa-check-double"></i> تأكيد تقرير: +٥ نقطة</div>
+        <div class="point-pill"><i class="fa-solid fa-camera"></i> صورة: +١٠ نقطة</div>
+        <div class="point-pill"><i class="fa-solid fa-fire"></i> سلسلة يومية: +٢٥ نقطة</div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div class="leaderboard">
+        <div class="lb-header"><i class="fa-solid fa-ranking-star"></i> المتصدرون هذا الشهر</div>
+        <div class="lb-row">
+          <div class="lb-rank rank-1">١</div>
+          <div class="lb-name">أحمد كاوه</div>
+          <div class="lb-city"><i class="fa-solid fa-location-dot"></i> كركوك</div>
+          <div class="lb-pts">٣٨٤٠ نقطة</div>
+        </div>
+        <div class="lb-row">
+          <div class="lb-rank rank-2">٢</div>
+          <div class="lb-name">سارة أمين</div>
+          <div class="lb-city"><i class="fa-solid fa-location-dot"></i> أربيل</div>
+          <div class="lb-pts">٣١٥٠ نقطة</div>
+        </div>
+        <div class="lb-row">
+          <div class="lb-rank rank-3">٣</div>
+          <div class="lb-name">فارس جلال</div>
+          <div class="lb-city"><i class="fa-solid fa-location-dot"></i> السليمانية</div>
+          <div class="lb-pts">٢٧٢٠ نقطة</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ════════════ PARTNER SERVICES ════════════ -->
+<section id="partners">
+  <div class="container">
+    <div class="section-label"><i class="fa-solid fa-handshake"></i> شراكات تجارية</div>
+    <h2 class="title">خدمات سيارات <span>داخل التطبيق</span></h2>
+    <p class="subtitle">مستقبلاً، QueueFuel سيتحول إلى منصة متكاملة للخدمات السيارات في المنطقة.</p>
+
+    <div class="services-wrap">
+      <div class="service-pill"><i class="fa-solid fa-oil-can"></i> زيوت محركات</div>
+      <div class="service-pill"><i class="fa-solid fa-car-battery"></i> بطاريات سيارات</div>
+      <div class="service-pill"><i class="fa-solid fa-soap"></i> غسيل سيارات</div>
+      <div class="service-pill"><i class="fa-solid fa-circle-dot"></i> تايرات وعجلات</div>
+      <div class="service-pill"><i class="fa-solid fa-screwdriver-wrench"></i> مراكز صيانة</div>
+      <div class="service-pill"><i class="fa-solid fa-shield-car"></i> تأمين سيارات</div>
+      <div class="service-pill"><i class="fa-solid fa-credit-card"></i> كروت الوقود</div>
+      <div class="service-pill"><i class="fa-solid fa-car"></i> تأجير سيارات</div>
+    </div>
+
+    <div style="margin-top:28px;padding:22px 26px;background:var(--card);border:1px solid var(--border);border-radius:20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+      <i class="fa-solid fa-circle-info" style="color:var(--amber);font-size:22px;flex-shrink:0;"></i>
+      <div>
+        <div style="font-weight:800;color:var(--amber);margin-bottom:4px;">هل أنت صاحب خدمة سيارات؟</div>
+        <div style="color:var(--muted);font-size:15px;">نحن نبني شراكات مع الشركات المحلية في كركوك وأربيل والسليمانية — تواصل معنا قريباً.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ════════════ CTA ════════════ -->
+<section id="cta">
+  <div class="container">
+    <div class="cta-box">
+      <h2>QueueFuel — لا تطلع عالعمياني</h2>
+      <p>اعرف الزحمة، ساعد غيرك، واجمع نقاط.</p>
+      <button
+        class="btn btn-dark"
+        onclick="
+          const el = this;
+          el.innerHTML = '<i class=\'fa-solid fa-check\'></i> شكراً! سنبلّغك عند الإطلاق';
+          el.disabled = true;
+          el.style.opacity = '0.85';
+        "
+      >
+        <i class="fa-brands fa-android"></i>
+        أبلّغني عند الإطلاق
+      </button>
+
+      <div style="margin-top:22px;display:flex;justify-content:center;gap:28px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;color:rgba(0,0,0,.6);font-size:14px;font-weight:700;">
+          <i class="fa-solid fa-circle-check"></i> مجاني ١٠٠٪
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;color:rgba(0,0,0,.6);font-size:14px;font-weight:700;">
+          <i class="fa-solid fa-circle-check"></i> بدون إعلانات مزعجة
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;color:rgba(0,0,0,.6);font-size:14px;font-weight:700;">
+          <i class="fa-solid fa-circle-check"></i> عربي وكردي
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════ FOOTER ════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div>
+        <a class="logo" href="#" style="font-size:20px;text-decoration:none;">
+          <i class="fa-solid fa-gas-pump"></i>
+          Queue<span>Fuel</span>
+        </a>
+        <div class="footer-copy" style="margin-top:6px;">
+          QueueFuel © 2026 — تطبيق مجتمعي لمعرفة زحمة محطات الوقود
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="#features">الميزات</a>
+        <a href="#rewards">النقاط</a>
+        <a href="#partners">الشركاء</a>
+        <a href="#cta">التطبيق</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
