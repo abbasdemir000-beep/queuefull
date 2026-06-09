@@ -1,10 +1,16 @@
 package com.example.data.local
 
 import com.example.domain.model.AdBanner
+import com.example.domain.model.AdCategory
+import com.example.domain.model.Advertisement
 import com.example.domain.model.AppUser
+import com.example.domain.model.Badge
 import com.example.domain.model.City
 import com.example.domain.model.QueueUpdate
+import com.example.domain.model.ReportConfidence
+import com.example.domain.model.RewardEntry
 import com.example.domain.model.Station
+import com.example.domain.model.UserBadge
 
 /**
  * Pure, lossless conversions between Room persistence entities and domain models.
@@ -116,7 +122,11 @@ fun AppUserEntity.toDomain(): AppUser = AppUser(
     name = name,
     role = role,
     points = points,
-    banned = banned
+    banned = banned,
+    lifetimePoints = lifetimePoints,
+    monthlyPoints = monthlyPoints,
+    accountType = accountType,
+    premiumUntil = premiumUntil
 )
 
 fun AppUser.toEntity(): AppUserEntity = AppUserEntity(
@@ -124,5 +134,99 @@ fun AppUser.toEntity(): AppUserEntity = AppUserEntity(
     name = name,
     role = role,
     points = points,
-    banned = banned
+    banned = banned,
+    lifetimePoints = lifetimePoints,
+    monthlyPoints = monthlyPoints,
+    accountType = accountType,
+    premiumUntil = premiumUntil
+)
+
+// ---- Advertisement ----
+fun AdvertisementEntity.toDomain(): Advertisement = Advertisement(
+    id = id,
+    title = title,
+    description = description,
+    imageUrl = imageUrl,
+    businessName = businessName,
+    category = AdCategory.valueOf(category),
+    targetCity = targetCity,
+    isActive = isActive,
+    startDate = startDate,
+    endDate = endDate,
+    clickCount = clickCount,
+    viewCount = viewCount
+)
+
+fun Advertisement.toEntity(): AdvertisementEntity = AdvertisementEntity(
+    id = id,
+    title = title,
+    description = description,
+    imageUrl = imageUrl,
+    businessName = businessName,
+    category = category.name,
+    targetCity = targetCity,
+    isActive = isActive,
+    startDate = startDate,
+    endDate = endDate,
+    clickCount = clickCount,
+    viewCount = viewCount
+)
+
+// ---- UserBadge ----
+fun UserBadgeEntity.toDomain(): UserBadge = UserBadge(
+    id = id,
+    userPhone = userPhone,
+    badge = Badge.valueOf(badge),
+    awardedAt = awardedAt
+)
+
+fun UserBadge.toEntity(): UserBadgeEntity = UserBadgeEntity(
+    id = id,
+    userPhone = userPhone,
+    badge = badge.name,
+    awardedAt = awardedAt
+)
+
+// ---- RewardEntry ----
+fun RewardEntryEntity.toDomain(): RewardEntry = RewardEntry(
+    id = id,
+    userPhone = userPhone,
+    stationId = stationId,
+    reportId = reportId,
+    monthYear = monthYear,
+    isVerified = isVerified,
+    createdAt = createdAt
+)
+
+fun RewardEntry.toEntity(): RewardEntryEntity = RewardEntryEntity(
+    id = id,
+    userPhone = userPhone,
+    stationId = stationId,
+    reportId = reportId,
+    monthYear = monthYear,
+    isVerified = isVerified,
+    createdAt = createdAt
+)
+
+// ---- ReportConfidence ----
+fun ReportConfidenceEntity.toDomain(): ReportConfidence = ReportConfidence(
+    id = id,
+    stationId = stationId,
+    originalReporterId = originalReporterId,
+    confirmationCount = confirmationCount,
+    confidenceScore = confidenceScore,
+    timestamp = timestamp,
+    expiresAt = expiresAt,
+    isExpired = isExpired
+)
+
+fun ReportConfidence.toEntity(): ReportConfidenceEntity = ReportConfidenceEntity(
+    id = id,
+    stationId = stationId,
+    originalReporterId = originalReporterId,
+    confirmationCount = confirmationCount,
+    confidenceScore = confidenceScore,
+    timestamp = timestamp,
+    expiresAt = expiresAt,
+    isExpired = isExpired
 )
