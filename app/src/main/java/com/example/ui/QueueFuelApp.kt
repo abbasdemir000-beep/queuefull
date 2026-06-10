@@ -38,6 +38,10 @@ import coil.compose.AsyncImage
 import com.example.domain.model.*
 import com.example.domain.usecase.ReportVerification
 import com.example.domain.usecase.AuthPolicy
+import com.example.ui.components.QfCategoriesGrid
+import com.example.ui.components.QfSectionHeader
+import com.example.ui.components.QueueFuelLogo
+import com.example.ui.components.QueueFuelSplashScreen
 import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -59,12 +63,18 @@ enum class NavigationTab {
 fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
     val context = LocalContext.current
     var currentTab by remember { mutableStateOf(NavigationTab.MAP_STATIONS) }
+    var showSplash by remember { mutableStateOf(true) }
 
     // Collect toast events from ViewModel and show them in the UI layer
     LaunchedEffect(Unit) {
         viewModel.toastEvent.collectLatest { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    if (showSplash) {
+        QueueFuelSplashScreen(onFinished = { showSplash = false })
+        return
     }
 
     // If not logged in, show beautiful dynamic login
@@ -219,35 +229,31 @@ fun LoginScreen(viewModel: QueueFuelViewModel) {
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Elegant brand icon
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(CosmicAccent),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.LocalGasStation,
-                    contentDescription = "QueueFuel",
-                    tint = Color.White,
-                    modifier = Modifier.size(44.dp)
-                )
-            }
+            // Master brand mark: location pin + people queue
+            QueueFuelLogo(size = 84.dp)
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "QueueFuel / دور البنزين ⛽",
-                fontSize = 24.sp,
+                text = "QueueFuel",
+                fontSize = 26.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = CosmicText,
                 textAlign = TextAlign.Center
             )
 
             Text(
-                text = "تقليل ازدحام محطات الوقود بذكاء وموثوقية في كركوك، أربيل، والسليمانية",
-                fontSize = 13.sp,
+                text = "كل الطوابير... بمكان واحد",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = QfTurquoise,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+
+            Text(
+                text = "معلومات الازدحام لحظة بلحظة — نبدأ بمحطات الوقود في كركوك، أربيل، والسليمانية",
+                fontSize = 12.sp,
                 color = CosmicTextLight,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -562,15 +568,33 @@ fun MapAndListDirection(viewModel: QueueFuelViewModel) {
         }
 
         // SCROLLABLE CONTAINER
+        val context = LocalContext.current
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .weight(1f)
         ) {
+            // Queue categories — fuel is live, the rest are on the roadmap
+            item {
+                QfSectionHeader(title = "أقسام الطوابير")
+                QfCategoriesGrid(
+                    selectedCategory = QueueCategory.FUEL,
+                    onCategoryClick = { category ->
+                        if (category.comingSoon) {
+                            Toast.makeText(
+                                context,
+                                "${category.labelAr} — قريباً في QueueFuel",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                )
+            }
+
             // Interactive Map Canvas Area
             item {
                 Text(
-                    text = "خريطة زحام السرا الحيّة 🗺️",
+                    text = "خريطة الازدحام الحيّة 🗺️",
                     fontSize = 14.sp,
                     color = CosmicText,
                     fontWeight = FontWeight.Bold,
@@ -596,34 +620,27 @@ fun MapAndListDirection(viewModel: QueueFuelViewModel) {
                 }
             }
 
-            // Stations list
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "محطات ${activeCity?.nameAr ?: ""} المحدثة (${filteredStations.size})",
-                        color = CosmicText,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
-                    )
-                    
-                    if (filteredStations.isEmpty()) {
-                        Text("لا نتائج", fontSize = 11.sp, color = Color.Gray)
-                    }
-                }
+            // Nearest queues — stations sorted by distance from the user
+            val nearestStations = filteredStations.sortedBy { st ->
+                viewModel.calculateDistance(
+                    viewModel.simLatitude, viewModel.simLongitude,
+                    st.latitude, st.longitude
+                )
             }
 
-            if (filteredStations.isEmpty()) {
+            item {
+                QfSectionHeader(
+                    title = "أقرب الطوابير — ${activeCity?.nameAr ?: ""} (${nearestStations.size})",
+                    trailing = if (nearestStations.isEmpty()) "لا نتائج" else null
+                )
+            }
+
+            if (nearestStations.isEmpty()) {
                 item {
                     EmptyStationsState()
                 }
             } else {
-                items(filteredStations) { station ->
+                items(nearestStations) { station ->
                     StationItemCard(
                         station = station,
                         viewModel = viewModel
@@ -719,11 +736,11 @@ fun InteractiveMapCanvas(
                 val canvasWidth = size.width
                 val canvasHeight = size.height
 
-                // 1. Draw grid backdrop (Tech theme)
+                // 1. Draw grid backdrop (dark map style)
                 val gridSpacing = 40f
                 for (x in 0..(canvasWidth / gridSpacing).toInt()) {
                     drawLine(
-                        color = Color.LightGray.copy(alpha = 0.25f),
+                        color = QfBorder.copy(alpha = 0.45f),
                         start = Offset(x * gridSpacing, 0f),
                         end = Offset(x * gridSpacing, canvasHeight),
                         strokeWidth = 1f
@@ -731,15 +748,15 @@ fun InteractiveMapCanvas(
                 }
                 for (y in 0..(canvasHeight / gridSpacing).toInt()) {
                     drawLine(
-                        color = Color.LightGray.copy(alpha = 0.25f),
+                        color = QfBorder.copy(alpha = 0.45f),
                         start = Offset(0f, y * gridSpacing),
                         end = Offset(canvasWidth, y * gridSpacing),
                         strokeWidth = 1f
                     )
                 }
 
-                // 2. Draw mock futuristic roads
-                val roadColor = Color(0xFF2E2820)
+                // 2. Draw mock roads (dark blue, map style)
+                val roadColor = QfSurfaceVariant
                 drawLine(
                     color = roadColor,
                     start = Offset(0f, canvasHeight * 0.4f),
@@ -845,11 +862,11 @@ fun InteractiveMapCanvas(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                MapLegendItem("فارغة", FuelGreen)
-                MapLegendItem("قصيرة", FuelShortGreen)
-                MapLegendItem("معتدلة", FuelYellow)
-                MapLegendItem("طويلة", FuelRed)
-                MapLegendItem("مغلقة", FuelClosed)
+                MapLegendItem("فارغة", QfSuccess)
+                MapLegendItem("قصيرة", QfSuccessLight)
+                MapLegendItem("متوسطة", QfWarning)
+                MapLegendItem("مزدحمة", QfError)
+                MapLegendItem("مغلقة", QfClosed)
             }
 
             // Hint in bottom-left help
@@ -1033,7 +1050,7 @@ fun BannerAdCard(ad: AdBanner) {
 
                 Text(
                     text = "قطاع: ${ad.category}",
-                    color = Color.Gray,
+                    color = QfTextTertiary,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -1043,7 +1060,7 @@ fun BannerAdCard(ad: AdBanner) {
 
             Text(
                 text = ad.title,
-                color = Color.White,
+                color = QfTextPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Right,
@@ -1052,7 +1069,7 @@ fun BannerAdCard(ad: AdBanner) {
 
             Text(
                 text = ad.description,
-                color = Color.LightGray,
+                color = QfTextSecondary,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(vertical = 4.dp),
                 textAlign = TextAlign.Right
@@ -1126,7 +1143,7 @@ fun StationItemCard(
                 Box(
                     modifier = Modifier
                         .background(
-                            if (station.type == "حكومية") CosmicTeal else Color(0xFFEF562D),
+                            if (station.type == "حكومية") QfDeepTeal else QfWarning,
                             RoundedCornerShape(6.dp)
                         )
                         .padding(horizontal = 8.dp, vertical = 3.dp)
@@ -1496,7 +1513,7 @@ fun UpdateStatusSubmissionDialog(
         onDismissRequest = onClose,
         title = {
             Text(
-                text = "تقريـر حالة السـرا ⛽",
+                text = "تقرير حالة الطابور 📋",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 textAlign = TextAlign.Right,
@@ -1522,7 +1539,7 @@ fun UpdateStatusSubmissionDialog(
                 ) {
                     val statuses = listOf(
                         "EMPTY" to "فارغة 🟢 (لا يوجد ازدحام)",
-                        "MODERATE" to "متوسطة 🟡 (ازدحام معتدل)",
+                        "MODERATE" to "متوسطة 🟠 (ازدحام متوسط)",
                         "LONG" to "مزدحمة 🔴 (طابور طويل جداً)"
                     )
                     
@@ -1680,15 +1697,16 @@ fun UpdateStatusSubmissionDialog(
 }
 
 
-// Status Prop helper
+// Status Prop helper — the four queue states of the design system:
+// empty = green, medium = orange, crowded = red, closed = gray.
 data class StatusProps(val label: String, val color: Color)
 fun getQueueStatusProps(status: String): StatusProps {
     return when (status) {
-        "EMPTY" -> StatusProps("فارغة 🟢", FuelGreen)
-        "SHORT" -> StatusProps("قصيرة 🟢", FuelShortGreen)
-        "MODERATE" -> StatusProps("معتدلة 🟡", FuelYellow)
-        "LONG" -> StatusProps("طويلة 🔴", FuelRed)
-        else -> StatusProps("مغلقة ⚫", FuelClosed)
+        "EMPTY" -> StatusProps("فارغة 🟢", QfSuccess)
+        "SHORT" -> StatusProps("قصيرة 🟢", QfSuccessLight)
+        "MODERATE" -> StatusProps("متوسطة 🟠", QfWarning)
+        "LONG" -> StatusProps("مزدحمة 🔴", QfError)
+        else -> StatusProps("مغلقة ⚫", QfClosed)
     }
 }
 
@@ -1710,10 +1728,10 @@ fun EmptyStationsState() {
             imageVector = Icons.Filled.SearchOff,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
-            tint = Color.Gray
+            tint = QfTextTertiary
         )
         Spacer(modifier = Modifier.height(10.dp))
-        Text("لم نجد محطات تطابق معايير الفرز هذه في المدينة المحددة.", color = Color.Gray, fontSize = 13.sp, textAlign = TextAlign.Center)
+        Text("لم نجد محطات تطابق معايير الفرز هذه في المدينة المحددة.", color = QfTextSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -3224,14 +3242,14 @@ fun FirebaseSettingsPanel(viewModel: QueueFuelViewModel) {
                 // Status indicator
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = if (viewModel.firebaseSyncEnabled) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFF6B7280).copy(alpha = 0.15f)
+                        containerColor = if (viewModel.firebaseSyncEnabled) QfSuccess.copy(alpha = 0.15f) else QfClosed.copy(alpha = 0.15f)
                     ),
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, if (viewModel.firebaseSyncEnabled) Color(0xFF10B981) else CosmicBorder)
+                    border = BorderStroke(1.dp, if (viewModel.firebaseSyncEnabled) QfSuccess else CosmicBorder)
                 ) {
                     Text(
                         text = viewModel.firebaseSyncStatus,
-                        color = if (viewModel.firebaseSyncEnabled) Color(0xFF10B981) else CosmicTextGray,
+                        color = if (viewModel.firebaseSyncEnabled) QfSuccess else CosmicTextGray,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
