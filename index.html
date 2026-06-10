@@ -3,34 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QueueFuel | اعرف زحمة محطة الوقود قبل لا تطلع</title>
-  <meta name="description" content="QueueFuel — تطبيق أندرويد مجتمعي لمعرفة حالة طوابير محطات الوقود في كركوك وأربيل والسليمانية بتحديثات فورية من المستخدمين." />
+  <title>QueueFuel | كل الطوابير… بمكان واحد</title>
+  <meta name="description" content="QueueFuel — تطبيق أندرويد مجتمعي لمعرفة حالة الطوابير بتحديثات فورية من المستخدمين. نبدأ بمحطات الوقود في كركوك وأربيل والسليمانية، ونتوسّع لكل طابور." />
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --amber:   #f0b030;
-      --orange:  #e8760c;
-      --bg:      #0b0908;
-      --surface: #141210;
-      --card:    #191512;
-      --border:  rgba(255,255,255,.08);
-      --border-amber: rgba(240,176,48,.22);
-      --text:    #fff;
-      --muted:   #b8b0a6;
-      --radius:  24px;
+      /* QueueFuel design system — deep teal / turquoise / navy */
+      --teal:     #0D9488;
+      --turq:     #2DD4BF;
+      --bg:       #0B1622;
+      --surface:  #152535;
+      --card:     #1C2F42;
+      --border:   #24405A;
+      --border-teal: rgba(45,212,191,.24);
+      --text:     #fff;
+      --muted:    #B6C2CE;
+      --tertiary: #7C8B99;
+      /* queue status system */
+      --success:  #22C55E;
+      --warning:  #F59E0B;
+      --error:    #EF4444;
+      --closed:   #6B7280;
+      --gold:     #F59E0B;
+      --radius:   24px;
     }
 
     html { scroll-behavior: smooth; }
 
     body {
-      font-family: "Cairo", sans-serif;
+      font-family: "Tajawal", sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.8;
@@ -41,13 +49,13 @@
     .container { max-width: 1160px; margin: auto; padding: 0 24px; }
 
     .btn {
-      background: linear-gradient(135deg, var(--orange), var(--amber));
-      color: #111;
+      background: linear-gradient(135deg, var(--teal), var(--turq));
+      color: #06231f;
       padding: 13px 28px;
       border-radius: 999px;
       text-decoration: none;
       font-weight: 800;
-      font-family: "Cairo", sans-serif;
+      font-family: "Tajawal", sans-serif;
       font-size: 16px;
       display: inline-flex;
       align-items: center;
@@ -55,15 +63,15 @@
       border: 0;
       cursor: pointer;
       transition: opacity .2s, transform .15s;
-      box-shadow: 0 6px 28px rgba(232,118,12,.35);
+      box-shadow: 0 6px 28px rgba(13,148,136,.4);
     }
     .btn:hover { opacity: .9; transform: translateY(-2px); }
 
     .section-label {
       display: inline-block;
-      background: rgba(240,176,48,.12);
-      color: var(--amber);
-      border: 1px solid var(--border-amber);
+      background: rgba(45,212,191,.12);
+      color: var(--turq);
+      border: 1px solid var(--border-teal);
       padding: 5px 18px;
       border-radius: 999px;
       font-size: 13px;
@@ -78,7 +86,7 @@
       margin-bottom: 10px;
       line-height: 1.3;
     }
-    .title span { color: var(--amber); }
+    .title span { color: var(--turq); }
 
     .subtitle {
       color: var(--muted);
@@ -89,7 +97,7 @@
 
     /* ── Header ── */
     header {
-      background: rgba(11,9,8,.92);
+      background: rgba(11,22,34,.92);
       position: sticky;
       top: 0;
       z-index: 100;
@@ -107,14 +115,14 @@
     .logo {
       font-size: 26px;
       font-weight: 900;
-      color: var(--amber);
+      color: var(--turq);
       text-decoration: none;
       display: flex;
       align-items: center;
       gap: 8px;
     }
-    .logo i { color: var(--orange); font-size: 22px; }
-    .logo span { color: var(--orange); }
+    .logo i { color: var(--teal); font-size: 22px; }
+    .logo span { color: var(--teal); }
 
     .nav-links {
       display: flex;
@@ -122,7 +130,7 @@
       gap: 6px;
     }
     .nav-links a {
-      color: #ccc;
+      color: #cdd8e2;
       text-decoration: none;
       font-weight: 700;
       padding: 7px 14px;
@@ -130,7 +138,7 @@
       transition: color .2s, background .2s;
       font-size: 15px;
     }
-    .nav-links a:hover { color: var(--amber); background: rgba(240,176,48,.08); }
+    .nav-links a:hover { color: var(--turq); background: rgba(45,212,191,.08); }
 
     /* ── Hero ── */
     .hero {
@@ -145,9 +153,9 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: rgba(232,118,12,.1);
-      border: 1px solid rgba(232,118,12,.3);
-      color: var(--orange);
+      background: rgba(13,148,136,.12);
+      border: 1px solid rgba(45,212,191,.3);
+      color: var(--turq);
       padding: 7px 18px;
       border-radius: 999px;
       font-size: 13px;
@@ -156,7 +164,7 @@
     }
     .hero-badge .dot {
       width: 8px; height: 8px;
-      background: var(--orange);
+      background: var(--turq);
       border-radius: 50%;
       animation: pulse 1.8s infinite;
     }
@@ -171,25 +179,25 @@
       line-height: 1.2;
       margin-bottom: 20px;
     }
-    .hero h1 span { color: var(--amber); }
+    .hero h1 span { color: var(--turq); }
 
     .hero-meta {
       display: flex;
       gap: 24px;
       margin-top: 28px;
     }
-    .hero-stat strong { display: block; font-size: 26px; color: var(--amber); font-weight: 800; }
+    .hero-stat strong { display: block; font-size: 26px; color: var(--turq); font-weight: 800; }
     .hero-stat span  { font-size: 13px; color: var(--muted); }
 
     /* ── Phone mockup ── */
     .phone {
-      background: linear-gradient(160deg, #1e1a15, #0c0a08);
-      border: 1px solid rgba(240,176,48,.22);
+      background: linear-gradient(160deg, #163041, #0c1826);
+      border: 1px solid rgba(45,212,191,.22);
       border-radius: 36px;
       padding: 22px 18px;
       box-shadow:
         0 0 0 1px rgba(0,0,0,.8),
-        0 30px 90px rgba(232,118,12,.22),
+        0 30px 90px rgba(13,148,136,.22),
         0 0 60px rgba(0,0,0,.6);
       position: relative;
       overflow: hidden;
@@ -198,7 +206,7 @@
       content: "";
       position: absolute;
       inset: 0;
-      background: radial-gradient(ellipse 70% 45% at 50% 0%, rgba(240,176,48,.07) 0%, transparent 70%);
+      background: radial-gradient(ellipse 70% 45% at 50% 0%, rgba(45,212,191,.1) 0%, transparent 70%);
       pointer-events: none;
     }
 
@@ -210,7 +218,7 @@
       padding-bottom: 14px;
       border-bottom: 1px solid var(--border);
     }
-    .phone-topbar .app-name { font-weight: 800; font-size: 17px; color: var(--amber); }
+    .phone-topbar .app-name { font-weight: 800; font-size: 17px; color: var(--turq); }
     .phone-topbar .city-sel {
       font-size: 13px;
       color: var(--muted);
@@ -228,7 +236,7 @@
       transition: border-color .2s;
     }
     .station-card:last-child { margin-bottom: 0; }
-    .station-card:hover { border-color: var(--border-amber); }
+    .station-card:hover { border-color: var(--border-teal); }
 
     .station-row {
       display: flex;
@@ -245,16 +253,16 @@
       font-weight: 800;
       white-space: nowrap;
     }
-    .tag-empty  { background: #0f2e1a; color: #4dd886; border: 1px solid #1a4d2c; }
-    .tag-medium { background: #2e220a; color: #ffc948; border: 1px solid #4a380f; }
-    .tag-busy   { background: #2e0f0f; color: #ff6b6b; border: 1px solid #4d1616; }
+    .tag-empty  { background: rgba(34,197,94,.12);  color: #4ADE80; border: 1px solid rgba(34,197,94,.3); }
+    .tag-medium { background: rgba(245,158,11,.12); color: #FBBF24; border: 1px solid rgba(245,158,11,.3); }
+    .tag-busy   { background: rgba(239,68,68,.12);  color: #F87171; border: 1px solid rgba(239,68,68,.3); }
 
     .station-meta {
       display: flex;
       align-items: center;
       gap: 14px;
       font-size: 12px;
-      color: #7a7068;
+      color: var(--tertiary);
     }
     .station-meta i { font-size: 11px; }
 
@@ -268,7 +276,7 @@
     .trust-bar {
       height: 100%;
       border-radius: 4px;
-      background: linear-gradient(90deg, var(--orange), var(--amber));
+      background: linear-gradient(90deg, var(--teal), var(--turq));
     }
 
     /* ── Sections ── */
@@ -282,14 +290,14 @@
     }
 
     .feature-card {
-      background: var(--card);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 28px 24px;
       transition: border-color .25s, transform .2s;
     }
     .feature-card:hover {
-      border-color: var(--border-amber);
+      border-color: var(--border-teal);
       transform: translateY(-3px);
     }
 
@@ -297,22 +305,22 @@
       width: 48px;
       height: 48px;
       border-radius: 14px;
-      background: rgba(240,176,48,.1);
+      background: rgba(45,212,191,.1);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 22px;
-      color: var(--amber);
+      color: var(--turq);
       margin-bottom: 16px;
     }
 
-    .feature-card h3 { font-size: 18px; color: var(--amber); margin-bottom: 8px; font-weight: 800; }
+    .feature-card h3 { font-size: 18px; color: var(--turq); margin-bottom: 8px; font-weight: 800; }
     .feature-card p  { color: var(--muted); font-size: 15px; line-height: 1.7; }
 
     /* ── Points / Rewards ── */
     .rewards-box {
-      background: linear-gradient(140deg, #1c1711, #261a0d);
-      border: 1px solid rgba(232,118,12,.28);
+      background: linear-gradient(140deg, #11403B, #0f2733);
+      border: 1px solid rgba(13,148,136,.3);
       border-radius: 32px;
       padding: 40px 36px;
       position: relative;
@@ -323,7 +331,7 @@
       position: absolute;
       top: -80px; left: -80px;
       width: 320px; height: 320px;
-      background: radial-gradient(circle, rgba(240,176,48,.08) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(45,212,191,.1) 0%, transparent 70%);
       pointer-events: none;
     }
 
@@ -334,14 +342,14 @@
     }
 
     .reward-card {
-      background: rgba(0,0,0,.3);
-      border: 1px solid rgba(240,176,48,.14);
+      background: rgba(0,0,0,.25);
+      border: 1px solid rgba(45,212,191,.16);
       border-radius: 20px;
       padding: 22px 20px;
       text-align: center;
     }
     .reward-card .reward-icon { font-size: 32px; margin-bottom: 10px; }
-    .reward-card h4 { color: var(--amber); font-size: 16px; font-weight: 800; margin-bottom: 6px; }
+    .reward-card h4 { color: var(--turq); font-size: 16px; font-weight: 800; margin-bottom: 6px; }
     .reward-card p  { color: var(--muted); font-size: 14px; }
 
     .points-row {
@@ -351,9 +359,9 @@
       margin-top: 24px;
     }
     .point-pill {
-      background: rgba(240,176,48,.1);
-      border: 1px solid var(--border-amber);
-      color: var(--amber);
+      background: rgba(45,212,191,.1);
+      border: 1px solid var(--border-teal);
+      color: var(--turq);
       padding: 8px 18px;
       border-radius: 999px;
       font-size: 14px;
@@ -365,18 +373,18 @@
 
     /* ── Leaderboard ── */
     .leaderboard {
-      background: var(--card);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       overflow: hidden;
       margin-top: 28px;
     }
     .lb-header {
-      background: rgba(240,176,48,.07);
+      background: rgba(45,212,191,.07);
       border-bottom: 1px solid var(--border);
       padding: 14px 22px;
       font-weight: 800;
-      color: var(--amber);
+      color: var(--turq);
       font-size: 15px;
       display: flex;
       align-items: center;
@@ -402,14 +410,14 @@
       font-size: 13px;
       flex-shrink: 0;
     }
-    .rank-1 { background: linear-gradient(135deg,#f0b030,#e8760c); color: #111; }
-    .rank-2 { background: #2a2a2a; color: #c0c0c0; }
-    .rank-3 { background: #231a0e; color: #cd7f32; }
+    .rank-1 { background: linear-gradient(135deg,var(--teal),var(--turq)); color: #06231f; }
+    .rank-2 { background: #2a3f52; color: #c8d4de; }
+    .rank-3 { background: #11403B; color: #5EEAD4; }
     .lb-name { flex: 1; font-weight: 700; }
     .lb-city { font-size: 13px; color: var(--muted); }
-    .lb-pts  { font-weight: 800; color: var(--amber); }
+    .lb-pts  { font-weight: 800; color: var(--gold); }
 
-    /* ── Partners / Services ── */
+    /* ── Queue categories ── */
     .services-wrap {
       display: flex;
       flex-wrap: wrap;
@@ -417,11 +425,11 @@
       margin-top: 8px;
     }
     .service-pill {
-      background: var(--card);
-      border: 1px solid var(--border-amber);
-      padding: 10px 22px;
+      background: var(--surface);
+      border: 1px solid var(--border-teal);
+      padding: 10px 20px;
       border-radius: 999px;
-      color: var(--amber);
+      color: var(--turq);
       font-weight: 800;
       font-size: 14px;
       display: flex;
@@ -429,11 +437,30 @@
       gap: 8px;
       transition: background .2s;
     }
-    .service-pill:hover { background: rgba(240,176,48,.1); }
+    .service-pill:hover { background: rgba(45,212,191,.1); }
+    .service-pill.soon { color: var(--muted); border-color: var(--border); }
+    .service-pill .badge-live {
+      background: rgba(34,197,94,.16);
+      color: #4ADE80;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 2px 9px;
+      border-radius: 999px;
+      margin-inline-start: 4px;
+    }
+    .service-pill .badge-soon {
+      background: rgba(124,139,153,.16);
+      color: var(--tertiary);
+      font-size: 11px;
+      font-weight: 800;
+      padding: 2px 9px;
+      border-radius: 999px;
+      margin-inline-start: 4px;
+    }
 
     /* ── CTA ── */
     .cta-box {
-      background: linear-gradient(135deg, var(--orange), var(--amber));
+      background: linear-gradient(135deg, var(--teal), var(--turq));
       border-radius: 36px;
       padding: 56px 32px;
       text-align: center;
@@ -447,14 +474,14 @@
       background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
       pointer-events: none;
     }
-    .cta-box h2 { font-size: 38px; color: #111; font-weight: 900; margin-bottom: 12px; position: relative; }
-    .cta-box p  { font-size: 18px; color: rgba(0,0,0,.65); margin-bottom: 28px; position: relative; }
+    .cta-box h2 { font-size: 38px; color: #06231f; font-weight: 900; margin-bottom: 12px; position: relative; }
+    .cta-box p  { font-size: 18px; color: rgba(0,0,0,.6); margin-bottom: 28px; position: relative; }
     .btn-dark {
-      background: #111;
-      color: var(--amber);
+      background: var(--bg);
+      color: var(--turq);
       box-shadow: 0 6px 28px rgba(0,0,0,.35);
     }
-    .btn-dark:hover { background: #1a1612; }
+    .btn-dark:hover { background: #122033; }
 
     /* ── Footer ── */
     footer {
@@ -471,12 +498,12 @@
     .footer-copy { color: var(--muted); font-size: 14px; }
     .footer-links { display: flex; gap: 20px; }
     .footer-links a { color: var(--muted); text-decoration: none; font-size: 14px; transition: color .2s; }
-    .footer-links a:hover { color: var(--amber); }
+    .footer-links a:hover { color: var(--turq); }
 
     /* ── Divider ── */
     .divider {
       height: 1px;
-      background: linear-gradient(90deg, transparent, var(--border-amber), transparent);
+      background: linear-gradient(90deg, transparent, var(--border-teal), transparent);
       margin: 0;
     }
 
@@ -505,13 +532,13 @@
   <div class="container">
     <nav>
       <a class="logo" href="#">
-        <i class="fa-solid fa-gas-pump"></i>
+        <i class="fa-solid fa-location-dot"></i>
         Queue<span>Fuel</span>
       </a>
       <div class="nav-links">
         <a href="#features">الميزات</a>
         <a href="#rewards">النقاط</a>
-        <a href="#partners">الشركاء</a>
+        <a href="#categories">الفئات</a>
         <a href="#cta" class="btn" style="padding:9px 20px; font-size:14px;">قريباً على Android</a>
       </div>
     </nav>
@@ -526,14 +553,14 @@
     <div>
       <div class="hero-badge">
         <span class="dot"></span>
-        مباشر الآن — كركوك · أربيل · السليمانية
+        كل الطوابير… بمكان واحد
       </div>
 
-      <h1>اعرف زحمة محطة الوقود <span>قبل لا تطلع.</span></h1>
+      <h1>اعرف زحمة الطابور <span>قبل لا تروح.</span></h1>
 
       <p style="color:var(--muted);font-size:19px;margin-bottom:28px;max-width:500px;">
-        QueueFuel يرسلك تقارير حقيقية من مستخدمين قدام المحطة.
-        GPS، صور، ونظام ثقة يخليك تعرف الوضع قبل لا تتحرك.
+        QueueFuel يوصّلك تقارير حقيقية من مستخدمين قدام المكان.
+        نبدأ بمحطات الوقود في كركوك وأربيل والسليمانية، ونتوسّع لكل طابور تنتظر فيه.
       </p>
 
       <div style="display:flex;gap:14px;flex-wrap:wrap;">
@@ -541,7 +568,7 @@
           <i class="fa-brands fa-android"></i>
           قريباً على Android
         </a>
-        <a class="btn" href="#features" style="background:transparent;color:var(--amber);border:1px solid var(--border-amber);box-shadow:none;">
+        <a class="btn" href="#features" style="background:transparent;color:var(--turq);border:1px solid var(--border-teal);box-shadow:none;">
           كيف يشتغل؟
           <i class="fa-solid fa-arrow-left" style="font-size:13px;"></i>
         </a>
@@ -566,7 +593,7 @@
     <!-- Right: Phone mockup -->
     <div class="phone">
       <div class="phone-topbar">
-        <span class="app-name"><i class="fa-solid fa-gas-pump" style="color:var(--orange);"></i> QueueFuel</span>
+        <span class="app-name"><i class="fa-solid fa-location-dot" style="color:var(--teal);"></i> QueueFuel</span>
         <span class="city-sel"><i class="fa-solid fa-location-dot"></i> كركوك</span>
       </div>
 
@@ -574,7 +601,7 @@
       <div class="station-card">
         <div class="station-row">
           <span class="station-name">محطة كركوك الرئيسية</span>
-          <span class="tag tag-busy"><i class="fa-solid fa-fire"></i> مزدحمة</span>
+          <span class="tag tag-busy"><i class="fa-solid fa-users"></i> مزدحمة</span>
         </div>
         <div class="station-meta">
           <span><i class="fa-regular fa-clock"></i> قبل ٤ دقائق</span>
@@ -593,7 +620,7 @@
           <span><i class="fa-regular fa-clock"></i> قبل ١١ دقيقة</span>
           <span><i class="fa-solid fa-shield-halved"></i> ثقة ٨٨٪</span>
         </div>
-        <div class="trust-bar-wrap"><div class="trust-bar" style="width:88%;background:linear-gradient(90deg,#c87c00,#ffc948);"></div></div>
+        <div class="trust-bar-wrap"><div class="trust-bar" style="width:88%;background:linear-gradient(90deg,#b45309,#FBBF24);"></div></div>
       </div>
 
       <!-- Station 3 -->
@@ -606,7 +633,7 @@
           <span><i class="fa-regular fa-clock"></i> قبل ٧ دقائق</span>
           <span><i class="fa-solid fa-shield-halved"></i> ثقة ٩١٪</span>
         </div>
-        <div class="trust-bar-wrap"><div class="trust-bar" style="width:91%;background:linear-gradient(90deg,#1a7a3a,#4dd886);"></div></div>
+        <div class="trust-bar-wrap"><div class="trust-bar" style="width:91%;background:linear-gradient(90deg,#15803d,#4ADE80);"></div></div>
       </div>
 
       <!-- Station 4 -->
@@ -619,7 +646,7 @@
           <span><i class="fa-regular fa-clock"></i> قبل ٢ دقيقة</span>
           <span><i class="fa-solid fa-shield-halved"></i> ثقة ٩٧٪</span>
         </div>
-        <div class="trust-bar-wrap"><div class="trust-bar" style="width:97%;background:linear-gradient(90deg,#c87c00,#ffc948);"></div></div>
+        <div class="trust-bar-wrap"><div class="trust-bar" style="width:97%;background:linear-gradient(90deg,#b45309,#FBBF24);"></div></div>
       </div>
     </div>
 
@@ -639,7 +666,7 @@
       <div class="feature-card">
         <div class="feat-icon"><i class="fa-solid fa-location-crosshairs"></i></div>
         <h3>تحقق بالـ GPS</h3>
-        <p>التقرير يُقبل فقط إذا المستخدم على بعد ٢٠٠ متر أو أقل من المحطة، ما يصير تبليغ كاذب من البيت.</p>
+        <p>التقرير يُقبل فقط إذا المستخدم على بعد ٢٠٠ متر أو أقل من المكان، ما يصير تبليغ كاذب من البيت.</p>
       </div>
 
       <div class="feature-card">
@@ -663,13 +690,13 @@
       <div class="feature-card">
         <div class="feat-icon"><i class="fa-solid fa-bell"></i></div>
         <h3>إشعارات ذكية</h3>
-        <p>فعّل إشعار لمحطة معينة وخليها تخبرك لما تفرغ أو تزدحم.</p>
+        <p>فعّل إشعار لمكان معيّن وخليه يخبرك لما يفرغ الطابور أو يزدحم.</p>
       </div>
 
       <div class="feature-card">
         <div class="feat-icon"><i class="fa-solid fa-map-location-dot"></i></div>
         <h3>خريطة حية</h3>
-        <p>شوف كل المحطات في مدينتك على خريطة ملوّنة حسب الحالة — أحمر، أصفر، أخضر.</p>
+        <p>شوف كل الأماكن في مدينتك على خريطة ملوّنة حسب الحالة — أخضر، برتقالي، أحمر.</p>
       </div>
     </div>
   </div>
@@ -689,7 +716,7 @@
         <div class="reward-card">
           <div class="reward-icon">🏅</div>
           <h4>نقاط مكتسبة</h4>
-          <p>تقرير صحيح <strong style="color:var(--amber);">+١٥</strong>، تأكيد تقرير <strong style="color:var(--amber);">+٥</strong>، صورة موثقة <strong style="color:var(--amber);">+١٠</strong></p>
+          <p>تقرير صحيح <strong style="color:var(--turq);">+١٥</strong>، تأكيد تقرير <strong style="color:var(--turq);">+٥</strong>، صورة موثقة <strong style="color:var(--turq);">+١٠</strong></p>
         </div>
         <div class="reward-card">
           <div class="reward-icon">🎖️</div>
@@ -698,8 +725,8 @@
         </div>
         <div class="reward-card">
           <div class="reward-icon">🎁</div>
-          <h4>جوائز شهرية</h4>
-          <p>مستقبلاً: زيت محرك، بطارية، غسيل سيارة، وكارت وقود</p>
+          <h4>سحوبات وجوائز</h4>
+          <p>كل تقرير موثّق يدخلك سحب جوائز من شركائنا المحليين</p>
         </div>
       </div>
 
@@ -738,29 +765,29 @@
 
 <div class="divider"></div>
 
-<!-- ════════════ PARTNER SERVICES ════════════ -->
-<section id="partners">
+<!-- ════════════ QUEUE CATEGORIES ════════════ -->
+<section id="categories">
   <div class="container">
-    <div class="section-label"><i class="fa-solid fa-handshake"></i> شراكات تجارية</div>
-    <h2 class="title">خدمات سيارات <span>داخل التطبيق</span></h2>
-    <p class="subtitle">مستقبلاً، QueueFuel سيتحول إلى منصة متكاملة للخدمات السيارات في المنطقة.</p>
+    <div class="section-label"><i class="fa-solid fa-layer-group"></i> فئات الطوابير</div>
+    <h2 class="title">كل الطوابير <span>بمكان واحد</span></h2>
+    <p class="subtitle">بدأنا بمحطات الوقود، ونتوسّع لكل طابور تنتظر فيه — دوائر حكومية، مستشفيات، بنوك، وأكثر.</p>
 
     <div class="services-wrap">
-      <div class="service-pill"><i class="fa-solid fa-oil-can"></i> زيوت محركات</div>
-      <div class="service-pill"><i class="fa-solid fa-car-battery"></i> بطاريات سيارات</div>
-      <div class="service-pill"><i class="fa-solid fa-soap"></i> غسيل سيارات</div>
-      <div class="service-pill"><i class="fa-solid fa-circle-dot"></i> تايرات وعجلات</div>
-      <div class="service-pill"><i class="fa-solid fa-screwdriver-wrench"></i> مراكز صيانة</div>
-      <div class="service-pill"><i class="fa-solid fa-shield-car"></i> تأمين سيارات</div>
-      <div class="service-pill"><i class="fa-solid fa-credit-card"></i> كروت الوقود</div>
-      <div class="service-pill"><i class="fa-solid fa-car"></i> تأجير سيارات</div>
+      <div class="service-pill"><i class="fa-solid fa-gas-pump"></i> محطات الوقود <span class="badge-live">مباشر</span></div>
+      <div class="service-pill soon"><i class="fa-solid fa-building-columns"></i> دوائر حكومية <span class="badge-soon">قريباً</span></div>
+      <div class="service-pill soon"><i class="fa-solid fa-hospital"></i> مستشفيات <span class="badge-soon">قريباً</span></div>
+      <div class="service-pill soon"><i class="fa-solid fa-money-check-dollar"></i> بنوك <span class="badge-soon">قريباً</span></div>
+      <div class="service-pill soon"><i class="fa-solid fa-graduation-cap"></i> جامعات <span class="badge-soon">قريباً</span></div>
+      <div class="service-pill soon"><i class="fa-solid fa-passport"></i> جوازات <span class="badge-soon">قريباً</span></div>
+      <div class="service-pill soon"><i class="fa-solid fa-headset"></i> مراكز خدمة <span class="badge-soon">قريباً</span></div>
+      <div class="service-pill soon"><i class="fa-solid fa-ellipsis"></i> والمزيد <span class="badge-soon">قريباً</span></div>
     </div>
 
-    <div style="margin-top:28px;padding:22px 26px;background:var(--card);border:1px solid var(--border);border-radius:20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
-      <i class="fa-solid fa-circle-info" style="color:var(--amber);font-size:22px;flex-shrink:0;"></i>
+    <div style="margin-top:28px;padding:22px 26px;background:var(--surface);border:1px solid var(--border);border-radius:20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+      <i class="fa-solid fa-circle-info" style="color:var(--turq);font-size:22px;flex-shrink:0;"></i>
       <div>
-        <div style="font-weight:800;color:var(--amber);margin-bottom:4px;">هل أنت صاحب خدمة سيارات؟</div>
-        <div style="color:var(--muted);font-size:15px;">نحن نبني شراكات مع الشركات المحلية في كركوك وأربيل والسليمانية — تواصل معنا قريباً.</div>
+        <div style="font-weight:800;color:var(--turq);margin-bottom:4px;">تدير مكاناً فيه طوابير؟</div>
+        <div style="color:var(--muted);font-size:15px;">نبني شراكات مع الجهات والخدمات المحلية في كركوك وأربيل والسليمانية لإضافة فئات جديدة — تواصل معنا قريباً.</div>
       </div>
     </div>
   </div>
@@ -772,7 +799,7 @@
 <section id="cta">
   <div class="container">
     <div class="cta-box">
-      <h2>QueueFuel — لا تطلع عالعمياني</h2>
+      <h2>QueueFuel — لا تروح عالعمياني</h2>
       <p>اعرف الزحمة، ساعد غيرك، واجمع نقاط.</p>
       <button
         class="btn btn-dark"
@@ -808,17 +835,17 @@
     <div class="footer-inner">
       <div>
         <a class="logo" href="#" style="font-size:20px;text-decoration:none;">
-          <i class="fa-solid fa-gas-pump"></i>
+          <i class="fa-solid fa-location-dot"></i>
           Queue<span>Fuel</span>
         </a>
         <div class="footer-copy" style="margin-top:6px;">
-          QueueFuel © 2026 — تطبيق مجتمعي لمعرفة زحمة محطات الوقود
+          QueueFuel © 2026 — تطبيق مجتمعي لمعرفة زحمة الطوابير
         </div>
       </div>
       <div class="footer-links">
         <a href="#features">الميزات</a>
         <a href="#rewards">النقاط</a>
-        <a href="#partners">الشركاء</a>
+        <a href="#categories">الفئات</a>
         <a href="#cta">التطبيق</a>
       </div>
     </div>
