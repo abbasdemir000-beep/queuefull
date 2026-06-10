@@ -9,5 +9,7 @@ data class AppUser(
     val lifetimePoints: Int = 0,
     val monthlyPoints: Int = 0,
     val accountType: String = AccountType.FREE.name,
-    val premiumUntil: Long? = null
+    val premiumUntil: Long? = null,
+    val city: String = "",
+    val phoneVerified: Boolean = false
 )

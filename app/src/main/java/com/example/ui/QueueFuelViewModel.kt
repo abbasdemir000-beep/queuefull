@@ -13,7 +13,10 @@ import com.example.domain.usecase.AuthPolicy
 import com.example.domain.usecase.CyclePolicy
 import com.example.domain.usecase.GeoProximity
 import com.example.domain.usecase.PointsPolicy
+import com.example.domain.usecase.ReportVerificationRequest
+import com.example.domain.usecase.ReportVerifier
 import com.example.domain.usecase.StatusExpiryPolicy
+import com.example.domain.usecase.StubReportVerifier
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -24,6 +27,10 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 class QueueFuelViewModel(application: Application) : AndroidViewModel(application) {
     
     private val repository: QueueFuelRepository = QueueFuelRepositoryImpl(application)
+
+    // AI verification for reports — MVP ships the deterministic stub; swap in a
+    // real vision-model implementation of ReportVerifier when an API key exists.
+    private val reportVerifier: ReportVerifier = StubReportVerifier()
 
     // Toast event channel — UI collects and shows Toast. Keeps VM free of android.widget.Toast.
     private val _toastEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
@@ -36,10 +43,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
         private set
     var authPhoneInput by mutableStateOf("")
     var authNameInput by mutableStateOf("")
-    var authOtpInput by mutableStateOf("")
-    var isOtpSent by mutableStateOf(false)
-    var simulatedOtp by mutableStateOf("")
-        private set
+    var authCityInput by mutableStateOf<Int?>(null)
 
     // Active City filter
     var selectedCityId by mutableStateOf<Int?>(null)
@@ -247,6 +251,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
 
     init {
         loadFirebaseConfig()
+        restoreSession()
         // Automatically default selectedCityId to the first city, if available
         viewModelScope.launch {
             approvedCities.collectLatest { cities ->
@@ -285,83 +290,77 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Auth Flows
-    fun sendOtp() {
-        if (!AuthPolicy.isValidPhone(authPhoneInput)) {
-            showToast("الرجاء إدخال رقم هاتف صحيح")
-            return
-        }
+    // Auth Flow — simple MVP registration: name + phone + city, saved directly.
+    // No OTP, no SMS, no Firebase Phone Auth. phoneVerified stays false.
+    fun registerAndLogin() {
         if (!AuthPolicy.isValidName(authNameInput)) {
-            showToast("الرجاء إدخال الاسم الكامل أولاً لتسجيل الدخول والبدء بحصد جوائز نقاط التقارير!")
+            showToast("الرجاء إدخال الاسم الكامل أولاً للتسجيل والبدء بحصد جوائز نقاط التقارير!")
             return
         }
-        // Generate a simple OTP, show it mockingly for demonstration
-        val randomOtp = AuthPolicy.generateOtp()
-        simulatedOtp = randomOtp
-        isOtpSent = true
-        showToast("تم إرسال رمز التحقق: $randomOtp")
-        triggerPushNotification("تأكيد التسجيل 📲", "رمز التحقق لمنصة QueueFuel هو: $randomOtp")
-    }
-
-    fun verifyOtp() {
-        if (!AuthPolicy.isOtpValid(authOtpInput, simulatedOtp)) {
-            showToast("رمز التحقق غير صحيح!")
+        if (!AuthPolicy.isValidPhone(authPhoneInput)) {
+            showToast("الرجاء إدخال رقم هاتف صحيح (10 أرقام على الأقل)")
+            return
+        }
+        val cityId = authCityInput
+        if (cityId == null) {
+            showToast("الرجاء اختيار مدينتك للمتابعة")
             return
         }
         viewModelScope.launch {
-            val phone = authPhoneInput
+            val phone = authPhoneInput.trim()
+            val cityName = approvedCities.value.find { it.id == cityId }?.nameAr ?: ""
             val existingUser = repository.getUserByPhone(phone)
-            if (existingUser != null) {
-                if (AuthPolicy.isUserBanned(existingUser)) {
-                    showToast("هذا الحساب محظور بسبب تكرار البلاغات الخاطئة!")
-                    return@launch
-                }
-                if (AuthPolicy.isAdminPhone(phone)) {
-                    if (existingUser.role != "ADMIN") {
-                        val updated = existingUser.copy(role = "ADMIN")
-                        repository.updateUser(updated)
-                        currentUser = updated
-                    } else {
-                        currentUser = existingUser
-                    }
-                } else {
-                    if (existingUser.role == "ADMIN") {
-                        val updated = existingUser.copy(role = "USER")
-                        repository.updateUser(updated)
-                        currentUser = updated
-                    } else {
-                        currentUser = existingUser
-                    }
-                }
-            } else {
-                val name = if (authNameInput.isNotBlank()) authNameInput else "مستخدم جديد"
-                val assignedRole = AuthPolicy.resolveRole(phone)
-                val assignedPoints = if (assignedRole == "ADMIN") PointsPolicy.ADMIN_INITIAL_POINTS else PointsPolicy.WELCOME_POINTS
-                val newUser = AppUser(
-                    phoneNumber = phone,
-                    name = name,
-                    role = assignedRole,
-                    points = assignedPoints
-                )
-                repository.insertUser(newUser)
-                currentUser = newUser
+            if (existingUser != null && AuthPolicy.isUserBanned(existingUser)) {
+                showToast("هذا الحساب محظور بسبب تكرار البلاغات الخاطئة!")
+                return@launch
             }
+            val assignedRole = AuthPolicy.resolveRole(phone)
+            val user = if (existingUser != null) {
+                existingUser.copy(
+                    name = authNameInput.trim(),
+                    city = cityName,
+                    role = assignedRole
+                )
+            } else {
+                val assignedPoints = if (assignedRole == "ADMIN") PointsPolicy.ADMIN_INITIAL_POINTS else PointsPolicy.WELCOME_POINTS
+                AppUser(
+                    phoneNumber = phone,
+                    name = authNameInput.trim(),
+                    role = assignedRole,
+                    points = assignedPoints,
+                    city = cityName,
+                    phoneVerified = false
+                )
+            }
+            repository.insertUser(user)
+            currentUser = user
+            selectedCityId = cityId
             isLoggedIn = true
+            prefs.edit().putString("logged_in_phone", phone).apply()
             showToast("تم تسجيل الدخول بنجاح")
             // Trigger onboarding notification
             triggerPushNotification(
-                "أهلاً بك في دور البنزين! ⛽", 
+                "أهلاً بك في دور البنزين! ⛽",
                 "لقد حصلت على 20 نقطة ترحيبية. ساعد جيرانك بتحديث حالات السرا لحصد المزيد!"
             )
+        }
+    }
+
+    private fun restoreSession() {
+        viewModelScope.launch {
+            val phone = prefs.getString("logged_in_phone", null) ?: return@launch
+            val user = repository.getUserByPhone(phone)
+            if (user != null && !AuthPolicy.isUserBanned(user)) {
+                currentUser = user
+                isLoggedIn = true
+            }
         }
     }
 
     fun logout() {
         isLoggedIn = false
         currentUser = null
-        isOtpSent = false
-        authOtpInput = ""
-        simulatedOtp = ""
+        prefs.edit().remove("logged_in_phone").apply()
     }
 
     // Role switching (dev testing only — ADMIN role gated to admin phone)
@@ -391,24 +390,49 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
         )
     }
 
-    // Submit user update
+    // Submit user report: GPS proximity + mandatory photo + AI verification.
+    // Only verified reports change the station, award points, and enter the raffle.
     fun submitStatusUpdate(
         stationId: Int,
         newQueueStatus: String,
         hasFuel: Boolean,
-        selectedFuel: String
+        selectedFuel: String,
+        photoPath: String?
     ) {
         val userPhone = currentUser?.phoneNumber ?: "00000"
         viewModelScope.launch {
             val stations = allStations.value
             val station = stations.find { it.id == stationId } ?: return@launch
 
-            // Proximity check:
+            // 1. Proximity check:
             if (!isUserNear(station)) {
                 val dist = calculateDistance(simLatitude, simLongitude, station.latitude, station.longitude)
                 showToast("أنت بعيد جداً (${dist.toInt()} متر) تحديثات السرا تتطلب أن تكون قريباً من المحطة (<200م)!")
                 return@launch
             }
+
+            // 2. Photo is mandatory:
+            if (photoPath.isNullOrBlank()) {
+                showToast("التقرير يتطلب صورة من المحطة! التقط صورة أو اخترها من المعرض 📷")
+                return@launch
+            }
+
+            // When GPS simulation is off, isUserNear() bypasses the geofence, so
+            // treat the reporter as standing at the station for verification too.
+            val reportLat = if (simulateGpsEnabled) simLatitude else station.latitude
+            val reportLng = if (simulateGpsEnabled) simLongitude else station.longitude
+
+            // 3. AI verification (stub for MVP — see ReportVerifier)
+            val result = reportVerifier.verify(
+                ReportVerificationRequest(
+                    stationLatitude = station.latitude,
+                    stationLongitude = station.longitude,
+                    userLatitude = reportLat,
+                    userLongitude = reportLng,
+                    claimedStatus = newQueueStatus,
+                    photoPath = photoPath
+                )
+            )
 
             val update = QueueUpdate(
                 stationId = stationId,
@@ -416,20 +440,77 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
                 hasFuel = hasFuel,
                 fuelType = selectedFuel,
                 userPhone = userPhone,
-                latitude = simLatitude,
-                longitude = simLongitude
+                latitude = reportLat,
+                longitude = reportLng,
+                photoPath = photoPath,
+                verification = result.verdict,
+                verificationNote = result.reason
             )
             repository.insertQueueUpdate(update)
-            
-            // Reload user model to sync newly earned points
-            currentUser = repository.getUserByPhone(userPhone)
-            showToast("تم تحديث الحالة بنجاح! حصلت على +15 نقطة. 🌟")
-            
-            // Refresh detail sheet
-            selectedStation = repository.allStations.first().find { it.id == stationId }
-            
-            // Trigger local nearby simulation toast
-            triggerLocalNearbyNotification(station, newQueueStatus)
+
+            if (result.isVerified) {
+                // Reload user model to sync newly earned points
+                currentUser = repository.getUserByPhone(userPhone)
+                showToast("تم التحقق من تقريرك وقبوله! حصلت على +15 نقطة ودخلت سحب الجوائز 🎉")
+
+                // Refresh detail sheet
+                selectedStation = repository.allStations.first().find { it.id == stationId }
+
+                // Trigger local nearby simulation toast
+                triggerLocalNearbyNotification(station, newQueueStatus)
+            } else {
+                showToast("لم يجتز تقريرك التحقق الآلي: ${result.reason} ⚠️ تم حفظه لمراجعة الأدمن.")
+            }
+        }
+    }
+
+    // ---- Report photo helpers (side effects live here, not in the UI) ----
+
+    private fun reportPhotosDir(): java.io.File =
+        java.io.File(getApplication<Application>().filesDir, "report_photos").apply { mkdirs() }
+
+    /** Persists a camera-captured bitmap; returns the saved file path or null. */
+    fun saveReportPhoto(bitmap: android.graphics.Bitmap): String? {
+        return try {
+            val file = java.io.File(reportPhotosDir(), "report_${System.currentTimeMillis()}.jpg")
+            java.io.FileOutputStream(file).use { out ->
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
+            }
+            file.absolutePath
+        } catch (e: Exception) {
+            showToast("تعذر حفظ الصورة، حاول مجدداً!")
+            null
+        }
+    }
+
+    /** Copies a gallery-picked image into app storage; returns the file path or null. */
+    fun importReportPhoto(uri: android.net.Uri): String? {
+        return try {
+            val file = java.io.File(reportPhotosDir(), "report_${System.currentTimeMillis()}.jpg")
+            val resolver = getApplication<Application>().contentResolver
+            resolver.openInputStream(uri)?.use { input ->
+                file.outputStream().use { input.copyTo(it) }
+            } ?: return null
+            file.absolutePath
+        } catch (e: Exception) {
+            showToast("تعذر استيراد الصورة، حاول مجدداً!")
+            null
+        }
+    }
+
+    // ---- Admin report review actions ----
+
+    fun adminApproveReport(reportId: Int) {
+        viewModelScope.launch {
+            repository.approveReport(reportId)
+            showToast("تم اعتماد التقرير يدوياً ومنح المُبلّغ النقاط ودخول السحب! ✅")
+        }
+    }
+
+    fun adminRejectReport(reportId: Int) {
+        viewModelScope.launch {
+            repository.rejectReport(reportId)
+            showToast("تم رفض التقرير ولن يدخل صاحبه السحب.")
         }
     }
 

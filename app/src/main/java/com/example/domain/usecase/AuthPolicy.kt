@@ -5,45 +5,37 @@ import com.example.domain.model.AppUser
 /**
  * Pure auth/role decision logic for QueueFuel.
  *
- * Framework-agnostic (no Android/Compose). Extracted from the ViewModel so
- * it can be unit-tested and later moved server-side when real OTP is implemented.
+ * Framework-agnostic (no Android/Compose), unit-tested.
  *
- * The "1234" backdoor OTP is intentionally preserved for MVP/testing.
+ * MVP login is a simple profile registration: name + phone + city, saved
+ * directly with `phoneVerified = false`. There is no OTP, no SMS, and no
+ * Firebase Phone Auth. Real phone verification can be added server-side later
+ * by flipping `phoneVerified` on the user.
  */
 object AuthPolicy {
 
     /** The hardcoded admin phone number for the MVP. */
     const val ADMIN_PHONE: String = "07774564334"
 
-    /** Minimum phone number length required for sending OTP. */
+    /** Minimum phone number length required to register. */
     const val MIN_PHONE_LENGTH: Int = 10
-
-    /** OTP backdoor code accepted during MVP/testing regardless of the real OTP. */
-    const val BACKDOOR_OTP: String = "1234"
 
     /**
      * True if the phone number meets the minimum length requirement.
-     * Mirrors the original `authPhoneInput.length < 10` check (inverted).
      */
     fun isValidPhone(phone: String): Boolean = phone.length >= MIN_PHONE_LENGTH
 
     /**
-     * True if the user name is non-blank (required before sending OTP).
+     * True if the user name is non-blank (required for registration).
      */
     fun isValidName(name: String): Boolean = name.trim().isNotBlank()
 
     /**
-     * Generates a 4-digit OTP string (1000..9999).
-     * Identical to the original inline generation.
+     * True when a registration form (name + phone + selected city) is complete
+     * and valid enough to save the user directly.
      */
-    fun generateOtp(): String = (1000..9999).random().toString()
-
-    /**
-     * True if the entered OTP matches either the expected OTP or the backdoor.
-     * Mirrors: `authOtpInput != simulatedOtp && authOtpInput != "1234"` (inverted).
-     */
-    fun isOtpValid(input: String, expected: String): Boolean =
-        input == expected || input == BACKDOOR_OTP
+    fun canRegister(name: String, phone: String, cityId: Int?): Boolean =
+        isValidName(name) && isValidPhone(phone) && cityId != null
 
     /**
      * Resolves the role for a phone number.

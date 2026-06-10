@@ -41,6 +41,12 @@ interface QueueFuelRepository {
     suspend fun confirmQueueStatus(stationId: Int, userPhone: String)
     suspend fun getLatestUpdateForStation(stationId: Int): QueueUpdate?
 
+    /** Admin override: mark a report verified and grant the reporter points + a raffle entry. */
+    suspend fun approveReport(reportId: Int)
+
+    /** Admin override: mark a report rejected (kept for audit, no rewards). */
+    suspend fun rejectReport(reportId: Int)
+
     // ---- Users / rewards ----
     suspend fun rewardUserPoints(phone: String, pointsToAdd: Int)
     suspend fun getUserByPhone(phone: String): AppUser?

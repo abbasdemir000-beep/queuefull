@@ -56,10 +56,15 @@ Clean-ish layering under `app/src/main/java/com/example/`:
 
 ## MVP shortcuts to be aware of
 
-- OTP is simulated: the code is shown on screen and `1234` is always accepted
-  (`AuthPolicy.BACKDOOR_OTP`).
+- Login is a direct profile registration (name + phone + city) — no OTP, no
+  SMS, no Firebase Phone Auth. Users are saved with `phoneVerified = false`.
 - Admin is a hardcoded phone: `AuthPolicy.ADMIN_PHONE` = `07774564334`.
 - GPS is simulated via the map screen toggle; proximity is a 200 m geofence
   (`GeoProximity`).
+- Reports require a photo and run through `ReportVerifier`
+  (`domain/usecase/ReportVerification.kt`). The MVP uses `StubReportVerifier`
+  (deterministic heuristics); a real AI vision verifier should implement the
+  same interface. Only `VERIFIED` reports update the station, award points,
+  and create a raffle `RewardEntry`.
 - `.env`/`GEMINI_API_KEY` and `google-services.json` are template leftovers and
   are not used by the code.

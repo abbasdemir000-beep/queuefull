@@ -37,34 +37,22 @@ class AuthPolicyTest {
         assertFalse(AuthPolicy.isValidName("\t\n"))
     }
 
-    // ---- OTP generation ----
+    // ---- Registration form validation (no OTP in MVP) ----
 
     @Test
-    fun `generated OTP is 4 digits`() {
-        repeat(50) {
-            val otp = AuthPolicy.generateOtp()
-            assertEquals(4, otp.length)
-            assertTrue(otp.toInt() in 1000..9999)
-        }
-    }
-
-    // ---- OTP verification ----
-
-    @Test
-    fun `correct OTP is accepted`() {
-        assertTrue(AuthPolicy.isOtpValid("5678", "5678"))
+    fun `complete registration form is accepted`() {
+        assertTrue(AuthPolicy.canRegister("أحمد", "07712345678", 1))
     }
 
     @Test
-    fun `backdoor 1234 is always accepted`() {
-        assertTrue(AuthPolicy.isOtpValid("1234", "9999"))
-        assertTrue(AuthPolicy.isOtpValid("1234", ""))
+    fun `registration without a city is rejected`() {
+        assertFalse(AuthPolicy.canRegister("أحمد", "07712345678", null))
     }
 
     @Test
-    fun `wrong OTP is rejected`() {
-        assertFalse(AuthPolicy.isOtpValid("0000", "5678"))
-        assertFalse(AuthPolicy.isOtpValid("", "5678"))
+    fun `registration with blank name or short phone is rejected`() {
+        assertFalse(AuthPolicy.canRegister("  ", "07712345678", 1))
+        assertFalse(AuthPolicy.canRegister("أحمد", "0771", 1))
     }
 
     // ---- Role resolution ----

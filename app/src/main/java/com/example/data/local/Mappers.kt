@@ -80,7 +80,10 @@ fun QueueUpdateEntity.toDomain(): QueueUpdate = QueueUpdate(
     timestamp = timestamp,
     userPhone = userPhone,
     latitude = latitude,
-    longitude = longitude
+    longitude = longitude,
+    photoPath = photoPath,
+    verification = verification,
+    verificationNote = verificationNote
 )
 
 fun QueueUpdate.toEntity(): QueueUpdateEntity = QueueUpdateEntity(
@@ -92,7 +95,10 @@ fun QueueUpdate.toEntity(): QueueUpdateEntity = QueueUpdateEntity(
     timestamp = timestamp,
     userPhone = userPhone,
     latitude = latitude,
-    longitude = longitude
+    longitude = longitude,
+    photoPath = photoPath,
+    verification = verification,
+    verificationNote = verificationNote
 )
 
 // ---- AdBanner ----
@@ -126,7 +132,9 @@ fun AppUserEntity.toDomain(): AppUser = AppUser(
     lifetimePoints = lifetimePoints,
     monthlyPoints = monthlyPoints,
     accountType = accountType,
-    premiumUntil = premiumUntil
+    premiumUntil = premiumUntil,
+    city = city,
+    phoneVerified = phoneVerified
 )
 
 fun AppUser.toEntity(): AppUserEntity = AppUserEntity(
@@ -138,7 +146,9 @@ fun AppUser.toEntity(): AppUserEntity = AppUserEntity(
     lifetimePoints = lifetimePoints,
     monthlyPoints = monthlyPoints,
     accountType = accountType,
-    premiumUntil = premiumUntil
+    premiumUntil = premiumUntil,
+    city = city,
+    phoneVerified = phoneVerified
 )
 
 // ---- Advertisement ----

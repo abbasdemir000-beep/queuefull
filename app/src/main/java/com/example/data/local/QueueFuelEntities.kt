@@ -50,7 +50,10 @@ data class QueueUpdateEntity(
     val timestamp: Long = System.currentTimeMillis(),
     val userPhone: String,
     val latitude: Double,
-    val longitude: Double
+    val longitude: Double,
+    val photoPath: String? = null,
+    val verification: String = "PENDING",
+    val verificationNote: String = ""
 )
 
 @Entity(tableName = "ad_banners")
@@ -74,5 +77,7 @@ data class AppUserEntity(
     val lifetimePoints: Int = 0,
     val monthlyPoints: Int = 0,
     val accountType: String = "FREE",
-    val premiumUntil: Long? = null
+    val premiumUntil: Long? = null,
+    val city: String = "",
+    val phoneVerified: Boolean = false
 )
