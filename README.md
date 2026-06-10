@@ -1,9 +1,12 @@
-# QueueFuel — دور البنزين ⛽
+# QueueFuel — كل الطوابير... بمكان واحد
 
-QueueFuel is a native Android app that helps drivers in **Kirkuk, Erbil, and
-Sulaymaniyah** avoid crowded fuel stations. Users report and confirm the live
-queue ("السرا") status of nearby stations, and the crowd-sourced data is shown
-on an interactive map and station list in real time. The UI is Arabic (RTL).
+QueueFuel is a native Android app for live, crowd-sourced queue tracking —
+**"one application for all queues."** The MVP covers fuel stations in
+**Kirkuk, Erbil, and Sulaymaniyah**: users report and confirm the live queue
+("السرا") status of nearby stations, and the data is shown on an interactive
+map and station list in real time. Future categories (government offices,
+hospitals, banks, universities, …) plug into the same design system — see
+[`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md). The UI is Arabic (RTL).
 
 > The app is fully self-contained and runs offline against a seeded local
 > database. An optional Firebase Realtime Database sync can be enabled from the
@@ -55,7 +58,7 @@ The code is organised into clean layers under `app/src/main/java/com/example/`:
 | `domain/usecase` | `AuthPolicy`, `CyclePolicy`, `GeoProximity`, `PointsPolicy`, `StatusExpiryPolicy` | Pure, unit-tested business rules |
 | `data/local` | Room database, DAO, entities, mappers | Persistence |
 | `data/repository` | `QueueFuelRepositoryImpl` | Room-backed repository + first-run seeding |
-| `ui` | `QueueFuelApp`, `QueueFuelViewModel`, `theme/` | Compose screens + state |
+| `ui` | `QueueFuelApp`, `QueueFuelViewModel`, `components/`, `theme/` | Compose screens, reusable design-system components, state |
 
 The `feature/` and `core/` packages are placeholders reserved for a future
 multi-module split; they are currently empty.
@@ -108,7 +111,8 @@ gradle :app:testDebugUnitTest
 
 - Use-case logic: `AuthPolicyTest`, `PointsPolicyTest`, `CyclePolicyTest`,
   `StatusExpiryPolicyTest`, `GeoProximityTest`, `ReportVerificationTest`
-- Compose screenshot baseline: `GreetingScreenshotTest` (Roborazzi)
+- Compose screenshot baselines: `GreetingScreenshotTest`, `BrandScreenshotTest`
+  (Roborazzi)
 
 ## Optional: Firebase cloud sync
 

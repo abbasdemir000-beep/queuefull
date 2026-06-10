@@ -2,38 +2,60 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// ============================================================================
+// QueueFuel Design System — "One application for all queues"
+// Source of truth: docs/DESIGN_SYSTEM.md (master branding spec)
+// Dark navy canvas, deep-teal primary, turquoise secondary. No other hues
+// except the four semantic queue-status colors below.
+// ============================================================================
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+// --- Brand ---
+val QfDeepTeal = Color(0xFF0D9488)        // Primary — actions, selection, brand pin
+val QfTurquoise = Color(0xFF2DD4BF)       // Secondary — highlights, glow, accents
+val QfTealContainer = Color(0xFF11403B)   // Filled container tint of primary
+val QfOnTealContainer = Color(0xFF5EEAD4) // Content on QfTealContainer
 
-// QueueFuel — Dark Automotive Theme
-// Status indicator colors (semantic, high-contrast on dark)
-val FuelGreen = Color(0xFF22C55E)        // فارغة — empty, green
-val FuelShortGreen = Color(0xFF4ADE80)   // قصيرة — short, light green
-val FuelYellow = Color(0xFFFCD34D)       // معتدلة — moderate, amber-yellow
-val FuelRed = Color(0xFFF87171)          // طويلة — long, red
-val FuelClosed = Color(0xFF6B7280)       // مغلقة — closed, gray
+// --- Canvas layers ---
+val QfNavy = Color(0xFF0B1622)            // Background — dark navy
+val QfSurface = Color(0xFF152535)         // Cards / sheets — dark blue
+val QfSurfaceVariant = Color(0xFF1C2F42)  // Inputs, chips, secondary panels
+val QfBorder = Color(0xFF24405A)          // Dividers / card borders
 
-// Dark background layers — warmth of engine metal at night
-val CosmicBackground = Color(0xFF0E0C0A)  // Near-black warm charcoal
-val CosmicSurface = Color(0xFF1C1814)     // Card / sheet surface
-val CosmicSecondaryBg = Color(0xFF242018) // Inputs, chips, secondary panels
-val CosmicBorder = Color(0xFF332C22)      // Warm dark divider
+// --- Text hierarchy ---
+val QfTextPrimary = Color(0xFFFFFFFF)     // Primary — white
+val QfTextSecondary = Color(0xFFB6C2CE)   // Secondary — light gray
+val QfTextTertiary = Color(0xFF7C8B99)    // Muted captions
 
-// Brand accent — fuel-fire amber orange
-val CosmicAccent = Color(0xFFE8760C)      // Primary action / highlight
-val CosmicAmber = Color(0xFFF0B030)       // Gold — points, badges, timers
-val CosmicTeal = Color(0xFFE8760C)        // Alias for accent (CTA buttons)
+// --- Semantic / queue status ---
+val QfSuccess = Color(0xFF22C55E)         // Empty queue — green
+val QfSuccessLight = Color(0xFF4ADE80)    // Short queue — light green
+val QfWarning = Color(0xFFF59E0B)         // Medium queue / warnings — orange
+val QfError = Color(0xFFEF4444)           // Crowded queue / errors — red
+val QfClosed = Color(0xFF6B7280)          // Closed — gray
+val QfGold = Color(0xFFF59E0B)            // Points, badges, trophies (= warning hue)
 
-// Text hierarchy on dark backgrounds
-val CosmicText = Color(0xFFF0E4CC)        // Primary — warm off-white
-val CosmicTextLight = Color(0xFFB5987E)   // Secondary — warm mid-gray
-val CosmicTextGray = Color(0xFF7A6456)    // Tertiary — muted warm
+// ============================================================================
+// Legacy aliases — older composables reference these names; they must always
+// resolve to the canonical tokens above so the whole app stays on-palette.
+// ============================================================================
+val FuelGreen = QfSuccess
+val FuelShortGreen = QfSuccessLight
+val FuelYellow = QfWarning
+val FuelRed = QfError
+val FuelClosed = QfClosed
 
-// Material3 container helpers
-val CosmicLightBlue = Color(0xFF3D2B0F)   // primaryContainer (dark amber tint)
-val CosmicDarkBlue = Color(0xFFF0B030)    // onPrimaryContainer (gold on dark amber)
+val CosmicBackground = QfNavy
+val CosmicSurface = QfSurface
+val CosmicSecondaryBg = QfSurfaceVariant
+val CosmicBorder = QfBorder
+
+val CosmicAccent = QfDeepTeal
+val CosmicAmber = QfGold
+val CosmicTeal = QfDeepTeal
+
+val CosmicText = QfTextPrimary
+val CosmicTextLight = QfTextSecondary
+val CosmicTextGray = QfTextTertiary
+
+val CosmicLightBlue = QfTealContainer
+val CosmicDarkBlue = QfOnTealContainer

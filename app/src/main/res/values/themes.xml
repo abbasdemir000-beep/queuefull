@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar" />
+    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar">
+        <!-- Dark navy window so launch shows brand color, never a white flash -->
+        <item name="android:windowBackground">@color/qf_navy</item>
+        <item name="android:statusBarColor">@color/qf_navy</item>
+        <item name="android:navigationBarColor">@color/qf_navy</item>
+    </style>
 </resources>
