@@ -15,5 +15,8 @@ data class QueueUpdate(
     val timestamp: Long = System.currentTimeMillis(),
     val userPhone: String,
     val latitude: Double,
-    val longitude: Double
+    val longitude: Double,
+    val photoPath: String? = null,
+    val verification: String = "PENDING",
+    val verificationNote: String = ""
 )

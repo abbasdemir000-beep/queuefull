@@ -11,20 +11,28 @@ on an interactive map and station list in real time. The UI is Arabic (RTL).
 
 ## Features
 
-- **Phone + OTP login** (simulated OTP for the MVP — see [Test credentials](#test-credentials)).
+- **Simple profile login** — name + phone + city, saved directly with no OTP/SMS
+  (`phoneVerified = false`; see [Test credentials](#test-credentials)).
 - **Interactive map** drawn with Compose `Canvas`, plotting stations colour-coded
   by queue status, plus a simulated GPS position.
 - **Live station list** with search and filters (status, government/private
   ownership, fuel type).
 - **Status reporting & confirmation** gated by a geofence (you must be within
   ~200 m of a station, simulated via the GPS controller) to deter false reports.
+- **Photo-verified reports** — every report requires a station photo (camera or
+  gallery) and passes through a pluggable `ReportVerifier`. The MVP ships a
+  deterministic stub (photo present + GPS inside the geofence + valid congestion
+  level); a real AI vision verifier can be plugged in without changing callers.
+  Only verified reports update the station, award points, and enter the monthly
+  raffle/reward pool. Failed reports are stored for admin review.
 - **Reliability points & a 5-hour competition cycle** — users earn points for
   reporting/confirming; points reset every 5 hours and the most active
   contributors are surfaced for rewards.
 - **Suggestions** — users can propose new stations or cities, with automatic
   duplicate detection within 100 m.
-- **Admin panel** — approve/reject/merge station and city suggestions, ban
-  users, manage the reward cycle, and configure Firebase sync.
+- **Admin panel** — approve/reject/merge station and city suggestions, review
+  submitted reports (photo + AI verdict, with manual override), ban users,
+  manage the reward cycle, and configure Firebase sync.
 - **Local notifications log** for nearby updates, expiry events, and cycle alerts.
 
 ## Tech stack
@@ -77,10 +85,8 @@ template and are **not** used by the current code.)
 
 ### Test credentials
 
-The OTP flow is simulated for the MVP:
+There is no OTP — login is a direct profile registration (name + phone + city):
 
-- **OTP:** the generated code is shown on screen; the backdoor code **`1234`**
-  is always accepted.
 - **Admin account:** log in with phone **`07774564334`** (any name) to get the
   `ADMIN` role and see the admin panel. Any other 10+ digit phone logs in as a
   regular `USER`.
@@ -101,7 +107,7 @@ gradle :app:testDebugUnitTest
 ```
 
 - Use-case logic: `AuthPolicyTest`, `PointsPolicyTest`, `CyclePolicyTest`,
-  `StatusExpiryPolicyTest`, `GeoProximityTest`
+  `StatusExpiryPolicyTest`, `GeoProximityTest`, `ReportVerificationTest`
 - Compose screenshot baseline: `GreetingScreenshotTest` (Roborazzi)
 
 ## Optional: Firebase cloud sync

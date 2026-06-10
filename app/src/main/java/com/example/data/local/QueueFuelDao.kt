@@ -57,6 +57,12 @@ interface QueueFuelDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertQueueUpdate(update: QueueUpdateEntity): Long
 
+    @Query("SELECT * FROM queue_updates WHERE id = :id")
+    suspend fun getQueueUpdateById(id: Int): QueueUpdateEntity?
+
+    @Query("UPDATE queue_updates SET verification = :status, verificationNote = :note WHERE id = :id")
+    suspend fun setReportVerification(id: Int, status: String, note: String)
+
     // Ad Banners
     @Query("SELECT * FROM ad_banners")
     fun getAllBanners(): Flow<List<AdBannerEntity>>

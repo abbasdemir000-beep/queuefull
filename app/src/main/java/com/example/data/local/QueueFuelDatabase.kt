@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         RewardEntryEntity::class,
         ReportConfidenceEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class QueueFuelDatabase : RoomDatabase() {
@@ -35,7 +35,7 @@ abstract class QueueFuelDatabase : RoomDatabase() {
                     QueueFuelDatabase::class.java,
                     "queue_fuel.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
@@ -100,6 +100,20 @@ abstract class QueueFuelDatabase : RoomDatabase() {
                         isExpired INTEGER NOT NULL DEFAULT 0
                     )
                 """.trimIndent())
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Simple profile registration (no OTP): city + phoneVerified flag
+                db.execSQL("ALTER TABLE app_users ADD COLUMN city TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE app_users ADD COLUMN phoneVerified INTEGER NOT NULL DEFAULT 0")
+
+                // Photo + AI verification fields on reports. Legacy reports already
+                // affected stations/points, so they are grandfathered as VERIFIED.
+                db.execSQL("ALTER TABLE queue_updates ADD COLUMN photoPath TEXT")
+                db.execSQL("ALTER TABLE queue_updates ADD COLUMN verification TEXT NOT NULL DEFAULT 'VERIFIED'")
+                db.execSQL("ALTER TABLE queue_updates ADD COLUMN verificationNote TEXT NOT NULL DEFAULT ''")
             }
         }
     }

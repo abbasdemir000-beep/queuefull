@@ -30,8 +30,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.layout.ContentScale
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.domain.model.*
+import com.example.domain.usecase.ReportVerification
 import com.example.domain.usecase.AuthPolicy
 import com.example.ui.theme.*
 import java.text.SimpleDateFormat
@@ -189,9 +194,12 @@ fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
     }
 }
 
-// ---------------------- 1. LOGIN SCREEN ----------------------
+// ---------------------- 1. LOGIN / REGISTRATION SCREEN ----------------------
+// Simple MVP registration: name + phone + city. No OTP, no SMS.
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LoginScreen(viewModel: QueueFuelViewModel) {
+    val cities by viewModel.approvedCities.collectAsState()
     var animateStart by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         animateStart = true
@@ -262,7 +270,7 @@ fun LoginScreen(viewModel: QueueFuelViewModel) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = if (!viewModel.isOtpSent) "سجل دخولك برقم الهاتف" else "أدخل رمز التحقق (OTP)",
+                        text = "سجل ملفك الشخصي وابدأ فوراً",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = CosmicText,
@@ -272,139 +280,110 @@ fun LoginScreen(viewModel: QueueFuelViewModel) {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    if (!viewModel.isOtpSent) {
-                        OutlinedTextField(
-                            value = viewModel.authPhoneInput,
-                            onValueChange = { viewModel.authPhoneInput = it },
-                            label = { Text("رقم الهاتف (الآسيا، الكورك، زين)", color = CosmicTextGray, fontSize = 12.sp) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            singleLine = true,
-                            leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null, tint = CosmicAccent) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = CosmicText,
-                                unfocusedTextColor = CosmicText,
-                                focusedBorderColor = CosmicAccent,
-                                unfocusedBorderColor = CosmicBorder,
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("phone_input")
-                        )
+                    OutlinedTextField(
+                        value = viewModel.authNameInput,
+                        onValueChange = { viewModel.authNameInput = it },
+                        label = { Text("الاسم الكامل 👤", color = CosmicTextGray, fontSize = 12.sp) },
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Filled.Badge, contentDescription = null, tint = CosmicAccent) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = CosmicText,
+                            unfocusedTextColor = CosmicText,
+                            focusedBorderColor = CosmicAccent,
+                            unfocusedBorderColor = CosmicBorder,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("name_input")
+                    )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                        OutlinedTextField(
-                            value = viewModel.authNameInput,
-                            onValueChange = { viewModel.authNameInput = it },
-                            label = { Text("الاسم الكامل (مطلوب للتسجيل) 👤", color = CosmicTextGray, fontSize = 12.sp) },
-                            singleLine = true,
-                            leadingIcon = { Icon(Icons.Filled.Badge, contentDescription = null, tint = CosmicAccent) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = CosmicText,
-                                unfocusedTextColor = CosmicText,
-                                focusedBorderColor = CosmicAccent,
-                                unfocusedBorderColor = CosmicBorder,
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    OutlinedTextField(
+                        value = viewModel.authPhoneInput,
+                        onValueChange = { viewModel.authPhoneInput = it },
+                        label = { Text("رقم الهاتف (الآسيا، الكورك، زين)", color = CosmicTextGray, fontSize = 12.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null, tint = CosmicAccent) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = CosmicText,
+                            unfocusedTextColor = CosmicText,
+                            focusedBorderColor = CosmicAccent,
+                            unfocusedBorderColor = CosmicBorder,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("phone_input")
+                    )
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                        Button(
-                            onClick = { viewModel.sendOtp() },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .testTag("send_otp_button"),
-                            colors = ButtonDefaults.buttonColors(containerColor = CosmicAccent),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("أرسل رمز التحقق 📲", fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                    } else {
-                        // OTP verification flow
-                        Text(
-                            text = "تم إرسال رمز التحقق إلى الرقم: ${viewModel.authPhoneInput}",
-                            fontSize = 12.sp,
-                            color = CosmicTextLight,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Right
-                        )
+                    Text(
+                        text = "اختر مدينتك 🏙️",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CosmicText,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Right
+                    )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                        // Simulated OTP display
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(CosmicAmber.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
-                                .border(1.dp, CosmicAmber.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                                .padding(10.dp)
-                        ) {
-                            Text(
-                                text = "محاكاة الرمز: أدخل الرمز الظاهر لتسجيل الدخول السريع: ${viewModel.simulatedOtp}",
-                                fontSize = 12.sp,
-                                color = CosmicAmber,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        cities.forEach { city ->
+                            val isSelected = viewModel.authCityInput == city.id
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.authCityInput = city.id },
+                                label = {
+                                    Text(
+                                        city.nameAr,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else CosmicText
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = CosmicAccent,
+                                    containerColor = CosmicSecondaryBg
+                                ),
+                                border = BorderStroke(1.dp, if (isSelected) CosmicAccent else CosmicBorder),
+                                modifier = Modifier.testTag("city_chip_${city.id}")
                             )
                         }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        OutlinedTextField(
-                            value = viewModel.authOtpInput,
-                            onValueChange = { viewModel.authOtpInput = it },
-                            label = { Text("رمز التحقق (4 أرقام)", color = CosmicTextGray, fontSize = 12.sp) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = CosmicAmber) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = CosmicText,
-                                unfocusedTextColor = CosmicText,
-                                focusedBorderColor = CosmicAmber,
-                                unfocusedBorderColor = CosmicBorder,
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("otp_input")
-                        )
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { viewModel.verifyOtp() },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(50.dp)
-                                    .testTag("verify_otp_button"),
-                                colors = ButtonDefaults.buttonColors(containerColor = CosmicAccent),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("تأكيد الدخول ✅", fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-
-                            OutlinedButton(
-                                onClick = { viewModel.logout() },
-                                modifier = Modifier
-                                    .weight(0.5f)
-                                    .height(50.dp),
-                                border = BorderStroke(1.dp, CosmicBorder),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = CosmicTextLight),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("تراجع")
-                            }
-                        }
                     }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Button(
+                        onClick = { viewModel.registerAndLogin() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("login_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = CosmicAccent),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("ابدأ الآن 🚀", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "بدون رمز تحقق — يتم حفظ ملفك مباشرة على جهازك. سيتم التحقق من رقم الهاتف لاحقاً.",
+                        fontSize = 10.sp,
+                        color = CosmicTextGray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
@@ -1500,6 +1479,18 @@ fun UpdateStatusSubmissionDialog(
     var selectedStatus by remember { mutableStateOf("EMPTY") }
     var hasFuel by remember { mutableStateOf(true) }
     var selectedFuelKind by remember { mutableStateOf("عادي") }
+    var photoPath by remember { mutableStateOf<String?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) photoPath = viewModel.saveReportPhoto(bitmap)
+    }
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) photoPath = viewModel.importReportPhoto(uri)
+    }
 
     AlertDialog(
         onDismissRequest = onClose,
@@ -1530,11 +1521,9 @@ fun UpdateStatusSubmissionDialog(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     val statuses = listOf(
-                        "EMPTY" to "فارغة 🟢 (طابور سريع جداً)",
-                        "SHORT" to "قصيرة 🟢 (تأخذ أقل من 10 دقائق)",
-                        "MODERATE" to "معتدلة 🟡 (تأخذ 15-30 دقيقة)",
-                        "LONG" to "طويلة 🔴 (مزدحمة جداً، أكثر من 30 دقيقة)",
-                        "CLOSED" to "مغلقة ⚫ (لا يوجد بنزين / معطلة)"
+                        "EMPTY" to "فارغة 🟢 (لا يوجد ازدحام)",
+                        "MODERATE" to "متوسطة 🟡 (ازدحام معتدل)",
+                        "LONG" to "مزدحمة 🔴 (طابور طويل جداً)"
                     )
                     
                     statuses.forEach { item ->
@@ -1601,6 +1590,63 @@ fun UpdateStatusSubmissionDialog(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("4. صورة من المحطة (إلزامية) 📷", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CosmicText, modifier = Modifier.padding(bottom = 6.dp))
+
+                if (photoPath != null) {
+                    AsyncImage(
+                        model = java.io.File(photoPath!!),
+                        contentDescription = "صورة التقرير",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, CosmicBorder, RoundedCornerShape(10.dp))
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { cameraLauncher.launch(null) },
+                        modifier = Modifier.weight(1f).testTag("take_photo_button"),
+                        border = BorderStroke(1.dp, CosmicAccent),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(if (photoPath == null) "التقط صورة 📸" else "إعادة الالتقاط 📸", fontSize = 11.sp, color = CosmicAccent, fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(
+                        onClick = { galleryLauncher.launch("image/*") },
+                        modifier = Modifier.weight(1f).testTag("pick_photo_button"),
+                        border = BorderStroke(1.dp, CosmicBorder),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("من المعرض 🖼️", fontSize = 11.sp, color = CosmicTextLight, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(CosmicAccent.copy(alpha = 0.10f), RoundedCornerShape(8.dp))
+                        .border(1.dp, CosmicAccent.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = "🤖 سيتم التحقق آلياً من مطابقة الصورة لموقع المحطة ومستوى الازدحام قبل قبول التقرير ومنح النقاط ودخول سحب الجوائز.",
+                        fontSize = 10.sp,
+                        color = CosmicAccent,
+                        textAlign = TextAlign.Right,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         confirmButton = {
@@ -1610,14 +1656,16 @@ fun UpdateStatusSubmissionDialog(
                         stationId = station.id,
                         newQueueStatus = selectedStatus,
                         hasFuel = hasFuel,
-                        selectedFuel = selectedFuelKind
+                        selectedFuel = selectedFuelKind,
+                        photoPath = photoPath
                     )
                     onClose()
                 },
+                enabled = photoPath != null,
                 colors = ButtonDefaults.buttonColors(containerColor = CosmicTeal),
                 modifier = Modifier.testTag("submit_update_dialog_btn")
             ) {
-                Text("إرسال التقرير 🚀", color = Color.White)
+                Text(if (photoPath == null) "أرفق صورة أولاً 📷" else "إرسال التقرير 🚀", color = Color.White)
             }
         },
         dismissButton = {
@@ -2152,11 +2200,13 @@ fun AdminDashboardPanel(viewModel: QueueFuelViewModel) {
     val allStations by viewModel.allStations.collectAsState()
     val allCities by viewModel.allCities.collectAsState()
     val allUsers by viewModel.allUsers.collectAsState()
+    val allReports by viewModel.allQueueUpdates.collectAsState()
 
     val pendingStations = allStations.filter { !it.isApproved }
     val pendingCities = allCities.filter { !it.isApproved }
+    val unverifiedReports = allReports.count { it.verification != ReportVerification.VERIFIED }
 
-    var adminSectionTab by remember { mutableStateOf(0) } // 0: Station suggestions, 1: City suggestions, 2: Users
+    var adminSectionTab by remember { mutableStateOf(0) } // 0: Stations, 1: Cities, 2: Users, 3: Firebase, 4: Reports
 
     Column(
         modifier = Modifier
@@ -2282,10 +2332,11 @@ fun AdminDashboardPanel(viewModel: QueueFuelViewModel) {
         Spacer(modifier = Modifier.height(14.dp))
 
         // Mini Tabs for Admin options
-        TabRow(
+        ScrollableTabRow(
             selectedTabIndex = adminSectionTab,
             containerColor = CosmicSurface,
             contentColor = CosmicText,
+            edgePadding = 0.dp,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[adminSectionTab]),
@@ -2312,6 +2363,12 @@ fun AdminDashboardPanel(viewModel: QueueFuelViewModel) {
                 selected = adminSectionTab == 3,
                 onClick = { adminSectionTab = 3 },
                 text = _text_wrap("سحاب الفايربيس 🌐")
+            )
+            Tab(
+                selected = adminSectionTab == 4,
+                onClick = { adminSectionTab = 4 },
+                text = _text_wrap("التقارير 📋 ($unverifiedReports)"),
+                modifier = Modifier.testTag("admin_reports_tab")
             )
         }
 
@@ -2365,10 +2422,138 @@ fun AdminDashboardPanel(viewModel: QueueFuelViewModel) {
                 items(filteredUsers) { user ->
                     AdminUserBlockCard(user, viewModel)
                 }
-            } else {
+            } else if (adminSectionTab == 3) {
                 // Firebase settings panel
                 item {
                     FirebaseSettingsPanel(viewModel = viewModel)
+                }
+            } else {
+                // Reports review block (photo + AI verification verdicts)
+                if (allReports.isEmpty()) {
+                    item {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(30.dp)
+                        ) {
+                            Text("لا توجد تقارير مقدمة من المستخدمين بعد 📋", color = CosmicTextGray, fontSize = 12.sp)
+                        }
+                    }
+                } else {
+                    items(allReports) { report ->
+                        AdminReportReviewCard(report, allStations, viewModel)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// REPORT REVIEW CARD (photo, AI verdict, manual override)
+@Composable
+fun AdminReportReviewCard(
+    report: QueueUpdate,
+    allStations: List<Station>,
+    viewModel: QueueFuelViewModel
+) {
+    val stationName = allStations.find { it.id == report.stationId }?.name ?: "محطة محذوفة (#${report.stationId})"
+    val statusProps = getQueueStatusProps(report.queueStatus)
+    val (verdictLabel, verdictColor) = when (report.verification) {
+        ReportVerification.VERIFIED -> "موثّق ✅" to FuelGreen
+        ReportVerification.REJECTED -> "مرفوض ❌" to FuelRed
+        else -> "قيد المراجعة ⌛" to CosmicAmber
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CosmicSurface),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, CosmicBorder),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .background(verdictColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(verdictLabel, color = verdictColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+                Text(formatTime(report.timestamp), color = CosmicTextGray, fontSize = 10.sp)
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "المحطة: $stationName",
+                color = CosmicText,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Right,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                text = "المُبلّغ: ${report.userPhone} | الحالة المُبلّغة: ${statusProps.label}",
+                color = CosmicTextLight,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Right,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (report.verificationNote.isNotBlank()) {
+                Text(
+                    text = "ملاحظة التحقق: ${report.verificationNote}",
+                    color = CosmicTextGray,
+                    fontSize = 10.sp,
+                    textAlign = TextAlign.Right,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (report.photoPath != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                AsyncImage(
+                    model = java.io.File(report.photoPath),
+                    contentDescription = "صورة التقرير",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, CosmicBorder, RoundedCornerShape(8.dp))
+                )
+            }
+
+            if (report.verification != ReportVerification.VERIFIED) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (report.verification != ReportVerification.REJECTED) {
+                        Button(
+                            onClick = { viewModel.adminRejectReport(report.id) },
+                            colors = ButtonDefaults.buttonColors(containerColor = CosmicBorder),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f).height(34.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("رفض ❌", color = CosmicText, fontSize = 11.sp)
+                        }
+                    }
+                    Button(
+                        onClick = { viewModel.adminApproveReport(report.id) },
+                        colors = ButtonDefaults.buttonColors(containerColor = FuelGreen),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1.5f).height(34.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("اعتماد يدوي ومنح النقاط ✅", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

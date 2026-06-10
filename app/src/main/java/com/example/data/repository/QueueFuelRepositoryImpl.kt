@@ -24,7 +24,9 @@ import com.example.domain.repository.QueueFuelRepository
 import com.example.domain.usecase.AuthPolicy
 import com.example.domain.usecase.BadgePolicy
 import com.example.domain.usecase.LeaderboardPolicy
+import com.example.domain.usecase.PointsPolicy
 import com.example.domain.usecase.ReportConfidencePolicy
+import com.example.domain.usecase.ReportVerification
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -101,55 +103,97 @@ class QueueFuelRepositoryImpl(context: Context) : QueueFuelRepository {
     }
 
     override suspend fun insertQueueUpdate(update: QueueUpdate) = withContext(Dispatchers.IO) {
-        val rowId = dao.insertQueueUpdate(update.toEntity()).toInt()
+        val reportId = dao.insertQueueUpdate(update.toEntity()).toInt()
 
+        // Only verified reports change the station, award points, and enter the
+        // raffle. Rejected/pending reports are stored for admin review only.
+        if (update.verification != ReportVerification.VERIFIED) return@withContext
+
+        applyVerifiedReportEffects(reportId, update)
+    }
+
+    private suspend fun applyVerifiedReportEffects(reportId: Int, update: QueueUpdate) {
         val stations = dao.getAllStations().first()
-        val station = stations.find { it.id == update.stationId }
-        if (station != null) {
-            val confirmedCount = if (station.queueStatus == update.queueStatus) {
-                station.confirmedCount + 1
-            } else {
-                1
-            }
-            dao.updateStation(
-                station.copy(
-                    queueStatus = update.queueStatus,
-                    hasFuel = update.hasFuel,
-                    confirmedCount = confirmedCount,
-                    lastUpdated = System.currentTimeMillis()
-                )
-            )
-            rewardUserPoints(update.userPhone, 15)
+        val station = stations.find { it.id == update.stationId } ?: return
 
-            // Upsert report confidence
-            val now = System.currentTimeMillis()
-            dao.insertReportConfidence(
-                ReportConfidenceEntity(
-                    stationId = update.stationId,
-                    originalReporterId = update.userPhone,
-                    confirmationCount = 0,
-                    confidenceScore = ReportConfidencePolicy.INITIAL_SCORE,
-                    timestamp = now,
-                    expiresAt = ReportConfidencePolicy.computeExpiresAt(now),
-                    isExpired = false
-                )
+        val confirmedCount = if (station.queueStatus == update.queueStatus) {
+            station.confirmedCount + 1
+        } else {
+            1
+        }
+        dao.updateStation(
+            station.copy(
+                queueStatus = update.queueStatus,
+                hasFuel = update.hasFuel,
+                confirmedCount = confirmedCount,
+                lastUpdated = System.currentTimeMillis()
             )
+        )
+        rewardUserPoints(update.userPhone, PointsPolicy.REPORT_POINTS)
 
-            // Check and award badges
-            val user = dao.getUserByPhone(update.userPhone)
-            if (user != null) {
-                val badge = BadgePolicy.highestEarned(user.lifetimePoints)
-                if (badge != null) {
-                    val existing = dao.getBadgesForUser(update.userPhone)
-                    if (existing.none { it.badge == badge.name }) {
-                        dao.insertUserBadge(
-                            UserBadgeEntity(userPhone = update.userPhone, badge = badge.name)
-                        )
-                    }
+        // Verified reports enter the monthly raffle/reward pool
+        dao.insertRewardEntry(
+            RewardEntryEntity(
+                userPhone = update.userPhone,
+                stationId = update.stationId,
+                reportId = reportId,
+                monthYear = currentMonthYear(),
+                isVerified = true
+            )
+        )
+
+        // Upsert report confidence
+        val now = System.currentTimeMillis()
+        dao.insertReportConfidence(
+            ReportConfidenceEntity(
+                stationId = update.stationId,
+                originalReporterId = update.userPhone,
+                confirmationCount = 0,
+                confidenceScore = ReportConfidencePolicy.INITIAL_SCORE,
+                timestamp = now,
+                expiresAt = ReportConfidencePolicy.computeExpiresAt(now),
+                isExpired = false
+            )
+        )
+
+        // Check and award badges
+        val user = dao.getUserByPhone(update.userPhone)
+        if (user != null) {
+            val badge = BadgePolicy.highestEarned(user.lifetimePoints)
+            if (badge != null) {
+                val existing = dao.getBadgesForUser(update.userPhone)
+                if (existing.none { it.badge == badge.name }) {
+                    dao.insertUserBadge(
+                        UserBadgeEntity(userPhone = update.userPhone, badge = badge.name)
+                    )
                 }
             }
         }
     }
+
+    override suspend fun approveReport(reportId: Int) = withContext(Dispatchers.IO) {
+        val report = dao.getQueueUpdateById(reportId) ?: return@withContext
+        if (report.verification == ReportVerification.VERIFIED) return@withContext
+
+        dao.setReportVerification(reportId, ReportVerification.VERIFIED, "اعتماد يدوي من الأدمن")
+        rewardUserPoints(report.userPhone, PointsPolicy.REPORT_POINTS)
+        dao.insertRewardEntry(
+            RewardEntryEntity(
+                userPhone = report.userPhone,
+                stationId = report.stationId,
+                reportId = reportId,
+                monthYear = currentMonthYear(),
+                isVerified = true
+            )
+        )
+    }
+
+    override suspend fun rejectReport(reportId: Int) = withContext(Dispatchers.IO) {
+        dao.setReportVerification(reportId, ReportVerification.REJECTED, "رفض يدوي من الأدمن")
+    }
+
+    private fun currentMonthYear(): String =
+        java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).format(java.util.Date())
 
     override suspend fun confirmQueueStatus(stationId: Int, userPhone: String) =
         withContext(Dispatchers.IO) {
