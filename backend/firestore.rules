@@ -1,0 +1,83 @@
+rules_version = '2';
+
+// QueueFuel Firestore security rules.
+//
+// Trust model: clients (anonymous Firebase Auth) may read public reference
+// data, manage their own profile fields, and append reports. Everything that
+// carries value — roles, points, trust scores, bans, station status, reward
+// entries — is written exclusively by Cloud Functions (Admin SDK bypasses
+// these rules) or by an ADMIN-role user. See docs/BACKEND.md.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+
+    // Public reference data: stations, cities, ad banners. Admin-writable so
+    // the future web panel can manage them without a dedicated function.
+    match /stations/{stationId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /cities/{cityId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /banners/{bannerId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // User profile. The owner may create it and update profile fields only;
+    // role/points/lifetimePoints/trustScore/banned/flagged are server-owned
+    // and can never be set or changed from a client.
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+             ['name', 'phone', 'phoneVerified', 'city', 'fcmToken', 'createdAt', 'updatedAt'])
+        && request.resource.data.get('phoneVerified', false) == false;
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'phone', 'city', 'fcmToken', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Reports are append-only from clients and always arrive PENDING; the
+    // onReportCreated function writes the verdict and all its consequences.
+    match /reports/{reportId} {
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.verification == 'PENDING'
+        && request.resource.data.queueStatus in ['EMPTY', 'MODERATE', 'LONG']
+        && request.resource.data.keys().hasOnly(
+             ['uid', 'userPhone', 'stationId', 'queueStatus', 'hasFuel', 'fuelType',
+              'latitude', 'longitude', 'photoPath', 'photoSha256', 'createdAt', 'verification']);
+      allow update, delete: if false;
+    }
+
+    // Raffle entries are created by Cloud Functions only.
+    match /rewardEntries/{entryId} {
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Duplicate-photo ledger: server-only.
+    match /photoHashes/{hash} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
