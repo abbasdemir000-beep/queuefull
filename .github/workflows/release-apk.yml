@@ -123,9 +123,16 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+      # base64 -i tolerates the CR/LF and whitespace that copy-pasting into the
+      # GitHub secrets UI tends to introduce.
       - name: Use production keystore when secrets are configured
         if: ${{ env.RELEASE_KEYSTORE_B64 != '' }}
-        run: echo "$RELEASE_KEYSTORE_B64" | base64 -d > release.keystore
+        run: |
+          if ! printf '%s' "$RELEASE_KEYSTORE_B64" | base64 -d -i > release.keystore || [ ! -s release.keystore ]; then
+            echo "::error::RELEASE_KEYSTORE_B64 is not valid base64. Re-create it with: base64 -w0 your-keystore.jks"
+            exit 1
+          fi
+          echo "Production keystore installed ($(wc -c < release.keystore) bytes)."
 
       - name: Build release APK
         run: gradle :app:assembleRelease --no-daemon --stacktrace
