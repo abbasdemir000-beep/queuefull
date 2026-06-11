@@ -10,6 +10,10 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
+    <!-- FCM station-update pushes (API 33+ requires an explicit grant; the
+         runtime request ships with the first real-backend release) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- allowBackup=false: points/roles live in the local DB, so a restored or
          edited backup would be a trivial way to forge points or admin state -->
     <application
@@ -32,6 +36,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Dormant with the placeholder google-services.json; activates only
+             when a real Firebase project config ships -->
+        <service
+            android:name=".data.remote.QueueFuelMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

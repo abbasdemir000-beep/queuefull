@@ -8,6 +8,28 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Typecheck + compile the Cloud Functions so backend/ can never rot.
+  backend-functions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/functions/package-lock.json
+
+      - name: Install functions dependencies
+        run: npm ci
+        working-directory: backend/functions
+
+      - name: Build functions (tsc, strict)
+        run: npm run build
+        working-directory: backend/functions
+
   unit-tests:
     runs-on: ubuntu-latest
     permissions:

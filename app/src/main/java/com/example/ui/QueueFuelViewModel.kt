@@ -7,11 +7,16 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshotFlow
 import com.example.data.location.RealLocationDataSource
+import com.example.data.remote.FirebaseBackendGateway
 import com.example.data.repository.QueueFuelRepositoryImpl
 import com.example.domain.model.*
+import com.example.domain.repository.BackendGateway
 import com.example.domain.repository.QueueFuelRepository
+import com.example.domain.usecase.AntiSpamPolicy
 import com.example.domain.usecase.AuthPolicy
+import com.example.domain.usecase.PhotoHash
 import com.example.domain.usecase.CloudSyncPayload
 import com.example.domain.usecase.CyclePolicy
 import com.example.domain.usecase.LocationPolicy
@@ -31,6 +36,21 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 class QueueFuelViewModel(application: Application) : AndroidViewModel(application) {
     
     private val repository: QueueFuelRepository = QueueFuelRepositoryImpl(application)
+
+    // Real backend (Firestore + Cloud Functions + FCM), anonymous device
+    // identity. Null while only the placeholder google-services.json is
+    // shipped — the app then behaves exactly like before, fully offline.
+    private val backend: BackendGateway? = FirebaseBackendGateway.createIfConfigured(application)
+
+    var backendUid by mutableStateOf<String?>(null)
+        private set
+    var serverProfile by mutableStateOf<BackendProfile?>(null)
+        private set
+    val backendActive: Boolean get() = backendUid != null
+
+    // Session-local duplicate-photo guard; the durable cross-device ledger
+    // lives server-side (photoHashes collection, see backend/).
+    private val recentPhotoHashes = mutableSetOf<String>()
 
     // AI verification for reports — MVP ships the deterministic stub; swap in a
     // real vision-model implementation of ReportVerifier when an API key exists.
@@ -359,6 +379,59 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
         }
+
+        // Real backend session (no-op until a real google-services.json ships)
+        startBackendSession()
+    }
+
+    // ---- Real backend session (anonymous identity; see BackendGateway) ----
+
+    private fun startBackendSession() {
+        val gw = backend ?: return
+        viewModelScope.launch {
+            val uid = gw.signIn() ?: return@launch
+            backendUid = uid
+            gw.registerFcmToken(uid)
+            launch {
+                gw.observeProfile(uid).collect { profile ->
+                    serverProfile = profile
+                    applyServerProfile(profile)
+                }
+            }
+            launch {
+                // Server stations win: mirror live snapshots into Room so every
+                // existing screen keeps reading the same local flows.
+                gw.observeStations().collect { remote ->
+                    remote.forEach { repository.insertStation(it) }
+                }
+            }
+            launch {
+                snapshotFlow { selectedCityId }.collect { cityId ->
+                    if (cityId != null) gw.subscribeToCityTopic(cityId)
+                }
+            }
+        }
+    }
+
+    /**
+     * The server profile is authoritative for role and bans whenever a
+     * backend is connected (AuthPolicy.effectiveRole) — the hardcoded admin
+     * phone remains only as the offline-demo fallback.
+     */
+    private suspend fun applyServerProfile(profile: BackendProfile?) {
+        val user = currentUser ?: return
+        if (profile == null) return
+        if (profile.banned && isLoggedIn) {
+            logout()
+            showToast("تم حظر هذا الحساب من الخادم.")
+            return
+        }
+        val role = AuthPolicy.effectiveRole(profile.role, user.phoneNumber)
+        if (role != user.role) {
+            val updated = user.copy(role = role)
+            currentUser = updated
+            repository.updateUser(updated)
+        }
     }
 
     // Auth Flow — simple MVP registration: name + phone + city, saved directly.
@@ -408,6 +481,14 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             selectedCityId = cityId
             isLoggedIn = true
             prefs.edit().putString("logged_in_phone", phone).apply()
+            // Mirror the profile to the backend under the device's anonymous
+            // uid and pick up any server-assigned role immediately.
+            backendUid?.let { uid ->
+                launch {
+                    backend?.upsertProfile(uid, user.name, user.phoneNumber, user.city)
+                    applyServerProfile(serverProfile)
+                }
+            }
             showToast("تم تسجيل الدخول بنجاح")
             // Trigger onboarding notification
             triggerPushNotification(
@@ -424,6 +505,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             if (user != null && !AuthPolicy.isUserBanned(user)) {
                 currentUser = user
                 isLoggedIn = true
+                applyServerProfile(serverProfile)
             }
         }
     }
@@ -477,6 +559,23 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             val stations = allStations.value
             val station = stations.find { it.id == stationId } ?: return@launch
 
+            // 0. Anti-spam cooldowns (the backend enforces the same
+            // AntiSpamPolicy authoritatively; this is fast local feedback):
+            val now = System.currentTimeMillis()
+            val myReports = repository.allQueueUpdates.first().filter { it.userPhone == userPhone }
+            val lastStationReport = myReports.filter { it.stationId == stationId }.maxOfOrNull { it.timestamp }
+            val lastAnyReport = myReports.maxOfOrNull { it.timestamp }
+            if (!AntiSpamPolicy.canReport(lastStationReport, lastAnyReport, now)) {
+                val waitMs = maxOf(
+                    AntiSpamPolicy.cooldownRemainingMs(lastStationReport, now, AntiSpamPolicy.STATION_COOLDOWN_MS),
+                    AntiSpamPolicy.cooldownRemainingMs(lastAnyReport, now, AntiSpamPolicy.GLOBAL_COOLDOWN_MS)
+                )
+                val waitMin = (waitMs / 60000L) + 1
+                showToast("الرجاء الانتظار $waitMin دقيقة قبل إرسال تقرير جديد ⏳")
+                lastReportResult = ReportFlowResult(verified = false, note = "تهدئة التقارير: انتظر $waitMin دقيقة ثم حاول مجدداً.")
+                return@launch
+            }
+
             // 1. Proximity check:
             val coords = effectiveCoordinates()
             if (!isUserNear(station)) {
@@ -490,6 +589,17 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             if (photoPath.isNullOrBlank()) {
                 showToast("التقرير يتطلب صورة من المحطة! التقط صورة أو اخترها من المعرض 📷")
                 lastReportResult = ReportFlowResult(verified = false, note = "التقرير يتطلب صورة من الموقع.")
+                return@launch
+            }
+
+            // 2b. Duplicate-photo guard (session-local; the durable
+            // cross-device ledger is the server's photoHashes collection):
+            val photoHash = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { PhotoHash.sha256Hex(java.io.File(photoPath).readBytes()) }.getOrNull()
+            }
+            if (AntiSpamPolicy.isDuplicatePhoto(photoHash, recentPhotoHashes)) {
+                showToast("هذه الصورة استُخدمت في تقرير سابق — التقط صورة جديدة من المحطة 📷")
+                lastReportResult = ReportFlowResult(verified = false, note = "الصورة مكررة من تقرير سابق.")
                 return@launch
             }
 
@@ -525,6 +635,13 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
                 verificationNote = result.reason
             )
             repository.insertQueueUpdate(update)
+            photoHash?.let { recentPhotoHashes.add(it) }
+
+            // Push to the real backend regardless of the local verdict — the
+            // server re-verifies and owns points/raffle/trust (fire & forget).
+            backendUid?.let { uid ->
+                launch { backend?.submitReport(uid, update, photoHash) }
+            }
 
             if (result.isVerified) {
                 // Reload user model to sync newly earned points

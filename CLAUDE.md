@@ -37,6 +37,13 @@ Clean-ish layering under `app/src/main/java/com/example/`:
 - `data/local` — Room DB, DAO, entities, and entity↔domain `Mappers.kt`.
 - `data/repository` — `QueueFuelRepositoryImpl` (Room-backed; seeds the DB on
   first launch).
+- `data/remote` — `FirebaseBackendGateway` (implements
+  `domain/repository/BackendGateway`) + the FCM service. Activates only with
+  a real `google-services.json`; with the committed placeholder the app is
+  fully offline. The deployable backend (Firestore rules, Cloud Functions)
+  lives in `backend/` — see `docs/BACKEND.md`. Anti-spam/trust constants are
+  mirrored in `backend/functions/src/policies.ts` (authoritative); keep both
+  sides in sync.
 - `ui` — `QueueFuelApp.kt` (navigation scaffold, login, alerts, suggestions,
   admin), `ui/screens/` (home, map, place details, report wizard, rewards,
   account), and `QueueFuelViewModel.kt` (state holder); theme in `ui/theme/`,
@@ -61,8 +68,11 @@ Clean-ish layering under `app/src/main/java/com/example/`:
 ## MVP shortcuts to be aware of
 
 - Login is a direct profile registration (name + phone + city) — no OTP, no
-  SMS, no Firebase Phone Auth. Users are saved with `phoneVerified = false`.
-- Admin is a hardcoded phone: `AuthPolicy.ADMIN_PHONE` = `07774564334`.
+  SMS, no Firebase Phone Auth (strict project rule). Backend identity is
+  anonymous/device-based (Firebase Anonymous Auth) once configured.
+- Admin: server-assigned role (`users/{uid}.role`) is authoritative when a
+  backend is connected; the hardcoded `AuthPolicy.ADMIN_PHONE` =
+  `07774564334` is only the offline-demo fallback.
 - GPS is simulated via the map screen toggle; proximity is a 200 m geofence
   (`GeoProximity`).
 - Reports require a photo and run through `ReportVerifier`
@@ -70,5 +80,7 @@ Clean-ish layering under `app/src/main/java/com/example/`:
   (deterministic heuristics); a real AI vision verifier should implement the
   same interface. Only `VERIFIED` reports update the station, award points,
   and create a raffle `RewardEntry`.
-- `.env`/`GEMINI_API_KEY` and `google-services.json` are template leftovers and
-  are not used by the code.
+- `.env`/`GEMINI_API_KEY` is a template leftover and not used by the code.
+  `app/google-services.json` is a deliberate placeholder: it lets the
+  Firebase SDKs compile while `FirebaseBackendGateway.createIfConfigured`
+  detects the placeholder project id and keeps the backend disabled.

@@ -64,3 +64,48 @@ security, testing, release engineering).
 - Product completeness vs. "كل الطوابير بمكان واحد": **35%** — fuel queues are
   functional locally; other categories are placeholders; no real-time sharing
   between users without a backend.
+
+---
+
+# Update — backend foundation milestone (2026-06-11)
+
+Shipped repo-locally (see docs/BACKEND.md): deployable `backend/` (Firestore
+rules, Cloud Functions for server-side verification/points/roles/anti-spam,
+FCM fan-out, Storage rules), a gated Firebase client (anonymous identity,
+station mirroring, report push, FCM service), anti-spam/trust/monetization
+domain policies with tests, CI for the functions, and the Play/admin-panel/
+monetization/iOS planning docs. The offline demo is unchanged — the backend
+client activates only when a real `google-services.json` ships.
+
+## Readiness scores (post-milestone)
+
+- Architecture: **85%** (+5) — backend boundary (`BackendGateway`) keeps the
+  domain framework-free; still no DI framework or module split.
+- Android release engineering: **75%** (=) — unchanged; still blocked on a
+  private keystore + Play account (external).
+- Security: **60%** (+15) — server-authoritative roles/points/trust/bans are
+  implemented and rule-enforced; score reaches ~80 % only after the Firebase
+  project is live and the placeholder signing keystore is replaced.
+- Performance: **85%** (=) — snapshot mirroring is bounded by station count.
+- Maintainability: **78%** (+3) — policies tested on both sides; the
+  ViewModel keeps growing and is the next refactor target.
+- Product completeness: **45%** (+10) — real-time sharing, push, and
+  anti-abuse exist end-to-end in code; they need only project credentials.
+
+**Overall production readiness: ~65%.**
+
+## Remaining work to first public release (estimated hours)
+
+| Task | Owner | Est. |
+|------|-------|------|
+| Create Firebase project, deploy backend/, real google-services.json | Abbas | 1–2 h |
+| Seed stations/cities in Firestore + smoke-test sync on a device | Abbas + dev | 2–4 h |
+| POST_NOTIFICATIONS runtime request + notifications settings UI | dev | 2–3 h |
+| osmdroid real map in MapScreen | dev | 6–10 h |
+| Account screen: show server points/trust; admin list from Firestore | dev | 4–6 h |
+| Private keystore + Play account + listing + privacy policy | Abbas | 3–5 h |
+| Crashlytics + closed-testing round with real users | both | 4–6 h |
+| **Total to a closed-testing release** | | **~22–36 h** |
+
+AI photo verification (vision API), the admin web panel v1, and AdMob are
+post-release tracks and excluded from the estimate above.
