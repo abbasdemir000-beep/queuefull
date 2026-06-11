@@ -1,8 +1,8 @@
 package com.example.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,11 +17,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -30,18 +27,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.layout.ContentScale
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.domain.model.*
 import com.example.domain.usecase.ReportVerification
 import com.example.domain.usecase.AuthPolicy
-import com.example.ui.components.QfCategoriesGrid
-import com.example.ui.components.QfSectionHeader
+import com.example.ui.components.QfSubScreenTopBar
 import com.example.ui.components.QueueFuelLogo
 import com.example.ui.components.QueueFuelSplashScreen
+import com.example.ui.screens.AccountScreen
+import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.MapScreen
+import com.example.ui.screens.PlaceDetailsScreen
+import com.example.ui.screens.ReportWizardScreen
+import com.example.ui.screens.RewardsScreen
 import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -50,19 +50,29 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 
+// Bottom navigation of the design board: الرئيسية / الخريطة / تقرير + / المكافآت / الحساب
 enum class NavigationTab {
-    MAP_STATIONS,      // الخريطة والمحطات
-    SUGGESTIONS,       // اقتراح محطة/مدينة
-    ALERTS,            // التنبيهات وسرّات
-    ADMIN_PANEL,       // لوحة الأدمن
-    ME_PROFILE         // ملفي الشخصي
+    HOME,       // الرئيسية
+    MAP,        // الخريطة
+    REWARDS,    // المكافآت
+    ACCOUNT     // الحساب
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Secondary surfaces pushed on top of a tab (with a back top-bar)
+enum class SubScreen {
+    NONE,
+    ALERTS,        // التنبيهات وسجل التحديثات
+    SUGGESTIONS,   // اقتراح محطة/مدينة
+    ADMIN          // لوحة الأدمن
+}
+
 @Composable
 fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
     val context = LocalContext.current
-    var currentTab by remember { mutableStateOf(NavigationTab.MAP_STATIONS) }
+    var currentTab by remember { mutableStateOf(NavigationTab.HOME) }
+    var subScreen by remember { mutableStateOf(SubScreen.NONE) }
+    var showReportWizard by remember { mutableStateOf(false) }
+    var reportInitialStation by remember { mutableStateOf<Station?>(null) }
     var showSplash by remember { mutableStateOf(true) }
 
     // Collect toast events from ViewModel and show them in the UI layer
@@ -77,132 +87,245 @@ fun QueueFuelApp(viewModel: QueueFuelViewModel = viewModel()) {
         return
     }
 
-    // If not logged in, show beautiful dynamic login
+    // If not logged in, show the registration screen
     if (!viewModel.isLoggedIn) {
         LoginScreen(viewModel = viewModel)
-    } else {
-        Scaffold(
-            bottomBar = {
-                NavigationBar(
-                    containerColor = CosmicSecondaryBg,
-                    tonalElevation = 8.dp,
-                    windowInsets = WindowInsets.navigationBars
-                ) {
-                    val role = viewModel.currentUser?.role ?: "USER"
+        return
+    }
 
-                    NavigationBarItem(
-                        selected = currentTab == NavigationTab.MAP_STATIONS,
-                        onClick = { currentTab = NavigationTab.MAP_STATIONS },
-                        icon = { Icon(Icons.Filled.Map, contentDescription = "المحطات") },
-                        label = { Text("المحطات", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = CosmicAccent,
-                            selectedTextColor = CosmicAccent,
-                            indicatorColor = CosmicAccent.copy(alpha = 0.18f),
-                            unselectedIconColor = CosmicTextGray,
-                            unselectedTextColor = CosmicTextGray
-                        ),
-                        modifier = Modifier.testTag("nav_stations")
-                    )
+    val detailStation = viewModel.selectedStation
 
-                    NavigationBarItem(
-                        selected = currentTab == NavigationTab.SUGGESTIONS,
-                        onClick = { currentTab = NavigationTab.SUGGESTIONS },
-                        icon = { Icon(Icons.Filled.AddLocationAlt, contentDescription = "اقتراح") },
-                        label = { Text("اقتراح", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = CosmicAccent,
-                            selectedTextColor = CosmicAccent,
-                            indicatorColor = CosmicAccent.copy(alpha = 0.18f),
-                            unselectedIconColor = CosmicTextGray,
-                            unselectedTextColor = CosmicTextGray
-                        ),
-                        modifier = Modifier.testTag("nav_suggest")
-                    )
-
-                    NavigationBarItem(
-                        selected = currentTab == NavigationTab.ALERTS,
-                        onClick = { currentTab = NavigationTab.ALERTS },
-                        icon = {
-                            BadgedBox(badge = {
-                                val notifs = viewModel.notifications.collectAsState().value
-                                if (notifs.isNotEmpty()) {
-                                    Badge { Text(notifs.size.toString()) }
-                                }
-                            }) {
-                                Icon(Icons.Filled.Notifications, contentDescription = "التنبيهات")
-                            }
-                        },
-                        label = { Text("التنبيهات", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = CosmicAccent,
-                            selectedTextColor = CosmicAccent,
-                            indicatorColor = CosmicAccent.copy(alpha = 0.18f),
-                            unselectedIconColor = CosmicTextGray,
-                            unselectedTextColor = CosmicTextGray
-                        ),
-                        modifier = Modifier.testTag("nav_alerts")
-                    )
-
-                    // Admin tab only visible to the designated admin phone
-                    if (role == "ADMIN") {
-                        NavigationBarItem(
-                            selected = currentTab == NavigationTab.ADMIN_PANEL,
-                            onClick = { currentTab = NavigationTab.ADMIN_PANEL },
-                            icon = { Icon(Icons.Filled.AdminPanelSettings, contentDescription = "الأدمن") },
-                            label = { Text("الأدمن", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = CosmicAmber,
-                                selectedTextColor = CosmicAmber,
-                                indicatorColor = CosmicAmber.copy(alpha = 0.18f),
-                                unselectedIconColor = CosmicTextGray,
-                                unselectedTextColor = CosmicTextGray
-                            ),
-                            modifier = Modifier.testTag("nav_admin")
-                        )
-                    }
-
-                    NavigationBarItem(
-                        selected = currentTab == NavigationTab.ME_PROFILE,
-                        onClick = { currentTab = NavigationTab.ME_PROFILE },
-                        icon = { Icon(Icons.Filled.Person, contentDescription = "الملف الشخصي") },
-                        label = { Text("حسابي", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = CosmicAccent,
-                            selectedTextColor = CosmicAccent,
-                            indicatorColor = CosmicAccent.copy(alpha = 0.18f),
-                            unselectedIconColor = CosmicTextGray,
-                            unselectedTextColor = CosmicTextGray
-                        ),
-                        modifier = Modifier.testTag("nav_profile")
-                    )
+    when {
+        // Report wizard — highest overlay (reachable from details or the + tab)
+        showReportWizard -> {
+            BackHandler {
+                showReportWizard = false
+                reportInitialStation = null
+            }
+            ReportWizardScreen(
+                viewModel = viewModel,
+                initialStation = reportInitialStation,
+                onClose = {
+                    showReportWizard = false
+                    reportInitialStation = null
                 }
-            },
-            containerColor = CosmicBackground
-        ) { innerPadding ->
-            Box(
+            )
+        }
+
+        // Place details — opened from home cards or the map bottom card
+        detailStation != null -> {
+            BackHandler { viewModel.selectedStation = null }
+            PlaceDetailsScreen(
+                station = detailStation,
+                viewModel = viewModel,
+                onBack = { viewModel.selectedStation = null },
+                onNewReport = { station ->
+                    reportInitialStation = station
+                    showReportWizard = true
+                }
+            )
+        }
+
+        // Pushed secondary surfaces (alerts / suggestions / admin)
+        subScreen != SubScreen.NONE -> {
+            BackHandler { subScreen = SubScreen.NONE }
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .background(CosmicBackground)
+                    .background(QfNavy)
+                    .navigationBarsPadding()
             ) {
-                Crossfade(targetState = currentTab, label = "TabTransition") { tab ->
-                    when (tab) {
-                        NavigationTab.MAP_STATIONS -> MapAndListDirection(viewModel)
-                        NavigationTab.SUGGESTIONS -> SuggestionsAndClaims(viewModel)
-                        NavigationTab.ALERTS -> AlertsAndSecurityLog(viewModel)
-                        NavigationTab.ADMIN_PANEL -> AdminDashboardPanel(viewModel)
-                        NavigationTab.ME_PROFILE -> MyProfileScreen(viewModel)
+                QfSubScreenTopBar(
+                    title = when (subScreen) {
+                        SubScreen.ALERTS -> "التنبيهات"
+                        SubScreen.SUGGESTIONS -> "اقتراح جديد"
+                        SubScreen.ADMIN -> "لوحة الإشراف"
+                        SubScreen.NONE -> ""
+                    },
+                    onBack = { subScreen = SubScreen.NONE }
+                )
+                when (subScreen) {
+                    SubScreen.ALERTS -> AlertsAndSecurityLog(viewModel)
+                    SubScreen.SUGGESTIONS -> SuggestionsAndClaims(viewModel)
+                    SubScreen.ADMIN -> AdminDashboardPanel(viewModel)
+                    SubScreen.NONE -> {}
+                }
+            }
+        }
+
+        // Main tabs
+        else -> {
+            Scaffold(
+                bottomBar = {
+                    QueueFuelBottomBar(
+                        currentTab = currentTab,
+                        onTabSelected = { currentTab = it },
+                        onReportClick = {
+                            reportInitialStation = null
+                            showReportWizard = true
+                        }
+                    )
+                },
+                containerColor = QfNavy
+            ) { innerPadding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .background(QfNavy)
+                ) {
+                    Crossfade(targetState = currentTab, label = "TabTransition") { tab ->
+                        when (tab) {
+                            NavigationTab.HOME -> HomeScreen(
+                                viewModel = viewModel,
+                                onOpenAlerts = { subScreen = SubScreen.ALERTS },
+                                onStationClick = { viewModel.selectedStation = it }
+                            )
+                            NavigationTab.MAP -> MapScreen(
+                                viewModel = viewModel,
+                                onOpenDetails = { viewModel.selectedStation = it }
+                            )
+                            NavigationTab.REWARDS -> RewardsScreen(viewModel)
+                            NavigationTab.ACCOUNT -> AccountScreen(
+                                viewModel = viewModel,
+                                onOpenAlerts = { subScreen = SubScreen.ALERTS },
+                                onOpenSuggestions = { subScreen = SubScreen.SUGGESTIONS },
+                                onOpenAdmin = { subScreen = SubScreen.ADMIN }
+                            )
+                        }
                     }
                 }
             }
         }
-        
-        if (viewModel.showFeedbackRewardDialog) {
-            FeedbackRewardDialog(viewModel = viewModel)
+    }
+
+    if (viewModel.showFeedbackRewardDialog) {
+        FeedbackRewardDialog(viewModel = viewModel)
+    }
+}
+
+/**
+ * Bottom bar matching the mockup: four tabs around a raised teal "تقرير +"
+ * action button in the center.
+ */
+@Composable
+fun QueueFuelBottomBar(
+    currentTab: NavigationTab,
+    onTabSelected: (NavigationTab) -> Unit,
+    onReportClick: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Transparent strip that lets the center button protrude above the bar
+            Spacer(modifier = Modifier.height(26.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(QfSurface)
+                    .navigationBarsPadding()
+                    .height(62.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BottomBarItem(
+                    label = "الرئيسية",
+                    icon = Icons.Filled.Home,
+                    selected = currentTab == NavigationTab.HOME,
+                    onClick = { onTabSelected(NavigationTab.HOME) },
+                    modifier = Modifier.weight(1f).testTag("nav_home")
+                )
+                BottomBarItem(
+                    label = "الخريطة",
+                    icon = Icons.Filled.Map,
+                    selected = currentTab == NavigationTab.MAP,
+                    onClick = { onTabSelected(NavigationTab.MAP) },
+                    modifier = Modifier.weight(1f).testTag("nav_map")
+                )
+                // Center slot: label under the floating action button
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Bottom
+                ) {
+                    Text(
+                        text = "تقرير +",
+                        color = QfTurquoise,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+                BottomBarItem(
+                    label = "المكافآت",
+                    icon = Icons.Filled.EmojiEvents,
+                    selected = currentTab == NavigationTab.REWARDS,
+                    onClick = { onTabSelected(NavigationTab.REWARDS) },
+                    modifier = Modifier.weight(1f).testTag("nav_rewards")
+                )
+                BottomBarItem(
+                    label = "الحساب",
+                    icon = Icons.Filled.Person,
+                    selected = currentTab == NavigationTab.ACCOUNT,
+                    onClick = { onTabSelected(NavigationTab.ACCOUNT) },
+                    modifier = Modifier.weight(1f).testTag("nav_account")
+                )
+            }
+        }
+
+        // Raised primary report action
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .size(54.dp)
+                .border(3.dp, QfNavy, CircleShape)
+                .clip(CircleShape)
+                .background(QfDeepTeal)
+                .clickable(onClick = onReportClick)
+                .testTag("nav_report"),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Add,
+                contentDescription = "تقرير جديد",
+                tint = Color.White,
+                modifier = Modifier.size(28.dp)
+            )
         }
     }
 }
+
+@Composable
+private fun BottomBarItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (selected) QfTurquoise else QfTextTertiary,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = label,
+            color = if (selected) QfTurquoise else QfTextTertiary,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
 
 // ---------------------- 1. LOGIN / REGISTRATION SCREEN ----------------------
 // Simple MVP registration: name + phone + city. No OTP, no SMS.
@@ -397,1316 +520,16 @@ fun LoginScreen(viewModel: QueueFuelViewModel) {
 }
 
 
-// ---------------------- 2. MAP & STATIONS DIRECT VIEW ----------------------
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun MapAndListDirection(viewModel: QueueFuelViewModel) {
-    val approvedCities by viewModel.approvedCities.collectAsState()
-    val approvedStations by viewModel.approvedStations.collectAsState()
-    val filteredStations = viewModel.filteredStationsList
-    val allBanners by viewModel.allBanners.collectAsState()
-
-    var showFilters by remember { mutableStateOf(false) }
-    var activeAdBanner by remember { mutableStateOf<AdBanner?>(null) }
-    
-    // Choose dynamic banner for selected city
-    val activeCity = approvedCities.find { it.id == viewModel.selectedCityId }
-    LaunchedEffect(viewModel.selectedCityId, allBanners) {
-        if (activeCity != null) {
-            val cityBanners = allBanners.filter { it.city == activeCity.nameAr }
-            activeAdBanner = if (cityBanners.isNotEmpty()) cityBanners.random() else null
-        }
-    }
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        // TOP Header search & City tab
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(CosmicSurface)
-                .padding(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Search Input
-                OutlinedTextField(
-                    value = viewModel.searchQuery,
-                    onValueChange = { viewModel.searchQuery = it },
-                    placeholder = { Text("ابحث عن محطة...", color = CosmicTextGray, fontSize = 12.sp) },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = CosmicTextLight) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = CosmicText,
-                        unfocusedTextColor = CosmicText,
-                        focusedContainerColor = CosmicSecondaryBg,
-                        unfocusedContainerColor = CosmicSecondaryBg,
-                        focusedBorderColor = CosmicAccent,
-                        unfocusedBorderColor = Color.Transparent
-                    )
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Filters Toggle
-                IconButton(
-                    onClick = { showFilters = !showFilters },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            if (showFilters) CosmicAccent else CosmicSecondaryBg,
-                            RoundedCornerShape(12.dp)
-                        )
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.FilterList,
-                        contentDescription = "الفلاتر",
-                        tint = if (showFilters) Color.White else CosmicText
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Cities selectors tabs ROW
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                approvedCities.forEach { city ->
-                    val isSelected = viewModel.selectedCityId == city.id
-                    Box(
-                        modifier = Modifier
-                            .clickable { viewModel.selectedCityId = city.id }
-                            .background(
-                                if (isSelected) CosmicAccent else CosmicSecondaryBg,
-                                RoundedCornerShape(30.dp)
-                            )
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = city.nameAr,
-                            color = if (isSelected) Color.White else CosmicText,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            // Expanded Collapsible filters view
-            AnimatedVisibility(visible = showFilters) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp)
-                ) {
-                    Divider(color = CosmicBorder, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text("فلترة متقدمة للمحطات:", color = CosmicText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // Filters switches or chips
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(
-                            selected = viewModel.filterStatusEmpty,
-                            onClick = { viewModel.filterStatusEmpty = !viewModel.filterStatusEmpty },
-                            label = { Text("فارغة 🟢") }
-                        )
-                        FilterChip(
-                            selected = viewModel.filterStatusShort,
-                            onClick = { viewModel.filterStatusShort = !viewModel.filterStatusShort },
-                            label = { Text("قصيرة 🟢") }
-                        )
-                        FilterChip(
-                            selected = viewModel.filterGovOnly,
-                            onClick = { 
-                                viewModel.filterGovOnly = !viewModel.filterGovOnly
-                                if (viewModel.filterGovOnly) viewModel.filterPrivateOnly = false
-                            },
-                            label = { Text("حكومية") }
-                        )
-                        FilterChip(
-                            selected = viewModel.filterPrivateOnly,
-                            onClick = { 
-                                viewModel.filterPrivateOnly = !viewModel.filterPrivateOnly
-                                if (viewModel.filterPrivateOnly) viewModel.filterGovOnly = false
-                            },
-                            label = { Text("أهلية") }
-                        )
-                        FilterChip(
-                            selected = viewModel.filterFuelNormal,
-                            onClick = { viewModel.filterFuelNormal = !viewModel.filterFuelNormal },
-                            label = { Text("بنزين عادي") }
-                        )
-                        FilterChip(
-                            selected = viewModel.filterFuelPremium,
-                            onClick = { viewModel.filterFuelPremium = !viewModel.filterFuelPremium },
-                            label = { Text("بنزين محسن") }
-                        )
-                        FilterChip(
-                            selected = viewModel.filterFuelSuper,
-                            onClick = { viewModel.filterFuelSuper = !viewModel.filterFuelSuper },
-                            label = { Text("سوبر") }
-                        )
-                    }
-                }
-            }
-        }
-
-        // SCROLLABLE CONTAINER
-        val context = LocalContext.current
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-        ) {
-            // Queue categories — fuel is live, the rest are on the roadmap
-            item {
-                QfSectionHeader(title = "أقسام الطوابير")
-                QfCategoriesGrid(
-                    selectedCategory = QueueCategory.FUEL,
-                    onCategoryClick = { category ->
-                        if (category.comingSoon) {
-                            Toast.makeText(
-                                context,
-                                "${category.labelAr} — قريباً في QueueFuel",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                )
-            }
-
-            // Interactive Map Canvas Area
-            item {
-                Text(
-                    text = "خريطة الازدحام الحيّة 🗺️",
-                    fontSize = 14.sp,
-                    color = CosmicText,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    textAlign = TextAlign.Right
-                )
-
-                InteractiveMapCanvas(
-                    viewModel = viewModel,
-                    stations = filteredStations
-                )
-            }
-
-            // Proximity/GPS Debugging controller
-            item {
-                GpsSimulationControllerCard(viewModel)
-            }
-
-            // Dynamic Banner Ad section targeted for city
-            item {
-                activeAdBanner?.let { ad ->
-                    BannerAdCard(ad = ad)
-                }
-            }
-
-            // Nearest queues — stations sorted by distance from the user
-            val nearestStations = filteredStations.sortedBy { st ->
-                viewModel.calculateDistance(
-                    viewModel.simLatitude, viewModel.simLongitude,
-                    st.latitude, st.longitude
-                )
-            }
-
-            item {
-                QfSectionHeader(
-                    title = "أقرب الطوابير — ${activeCity?.nameAr ?: ""} (${nearestStations.size})",
-                    trailing = if (nearestStations.isEmpty()) "لا نتائج" else null
-                )
-            }
-
-            if (nearestStations.isEmpty()) {
-                item {
-                    EmptyStationsState()
-                }
-            } else {
-                items(nearestStations) { station ->
-                    StationItemCard(
-                        station = station,
-                        viewModel = viewModel
-                    )
-                }
-            }
-        }
-    }
-
-    // Status reporter bottom dialog popup
-    var updateTargetStation by remember { mutableStateOf<Station?>(null) }
-    viewModel.selectedStation?.let { station ->
-        StationDetailBottomSheet(
-            station = station,
-            viewModel = viewModel,
-            onClose = { viewModel.selectedStation = null },
-            onOpenUpdateDialog = { updateTargetStation = station }
-        )
-    }
-
-    // Update Status submission Dialog
-    updateTargetStation?.let { station ->
-        UpdateStatusSubmissionDialog(
-            station = station,
-            viewModel = viewModel,
-            onClose = { updateTargetStation = null }
-        )
-    }
-}
-
-// ---------------------- INTERACTIVE MAP CANVAS ----------------------
-@Composable
-fun InteractiveMapCanvas(
-    viewModel: QueueFuelViewModel,
-    stations: List<Station>
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(260.dp)
-            .padding(horizontal = 16.dp)
-            .testTag("interactive_map_card"),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CosmicSecondaryBg),
-        border = BorderStroke(1.dp, CosmicBorder),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            val userLat = viewModel.simLatitude
-            val userLng = viewModel.simLongitude
-
-            // We center the canvas around user lat/long or the average coordinate of active stations.
-            // Let's use user GPS or first station as center
-            val centerLat = if (stations.isNotEmpty()) stations.first().latitude else userLat
-            val centerLng = if (stations.isNotEmpty()) stations.first().longitude else userLng
-
-            // Relative pixel multipliers
-            val latMapRange = 0.08
-            val lngMapRange = 0.08
-
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(stations) {
-                        detectTapGestures { offset ->
-                            val width = size.width
-                            val height = size.height
-
-                            var closestStation: Station? = null
-                            var minDistance = Float.MAX_VALUE
-
-                            stations.forEach { st ->
-                                // Project coordinates
-                                val relLng = (st.longitude - centerLng) / lngMapRange
-                                val relLat = (st.latitude - centerLat) / latMapRange
-
-                                val x = (width / 2f) + (relLng * width).toFloat()
-                                val y = (height / 2f) - (relLat * height).toFloat() // y goes down
-
-                                val tapDist = sqrt((offset.x - x).pow(2) + (offset.y - y).pow(2))
-                                if (tapDist < 35f && tapDist < minDistance) {
-                                    closestStation = st
-                                    minDistance = tapDist
-                                }
-                            }
-
-                            if (closestStation != null) {
-                                viewModel.selectedStation = closestStation
-                            }
-                        }
-                    }
-            ) {
-                val canvasWidth = size.width
-                val canvasHeight = size.height
-
-                // 1. Draw grid backdrop (dark map style)
-                val gridSpacing = 40f
-                for (x in 0..(canvasWidth / gridSpacing).toInt()) {
-                    drawLine(
-                        color = QfBorder.copy(alpha = 0.45f),
-                        start = Offset(x * gridSpacing, 0f),
-                        end = Offset(x * gridSpacing, canvasHeight),
-                        strokeWidth = 1f
-                    )
-                }
-                for (y in 0..(canvasHeight / gridSpacing).toInt()) {
-                    drawLine(
-                        color = QfBorder.copy(alpha = 0.45f),
-                        start = Offset(0f, y * gridSpacing),
-                        end = Offset(canvasWidth, y * gridSpacing),
-                        strokeWidth = 1f
-                    )
-                }
-
-                // 2. Draw mock roads (dark blue, map style)
-                val roadColor = QfSurfaceVariant
-                drawLine(
-                    color = roadColor,
-                    start = Offset(0f, canvasHeight * 0.4f),
-                    end = Offset(canvasWidth, canvasHeight * 0.4f),
-                    strokeWidth = 24f
-                )
-                drawLine(
-                    color = roadColor,
-                    start = Offset(canvasWidth * 0.3f, 0f),
-                    end = Offset(canvasWidth * 0.3f, canvasHeight),
-                    strokeWidth = 24f
-                )
-                drawLine(
-                    color = roadColor,
-                    start = Offset(0f, canvasHeight * 0.8f),
-                    end = Offset(canvasWidth, canvasHeight * 0.8f),
-                    strokeWidth = 16f
-                )
-                drawLine(
-                    color = roadColor,
-                    start = Offset(canvasWidth * 0.7f, 0f),
-                    end = Offset(canvasWidth * 0.7f, canvasHeight),
-                    strokeWidth = 16f
-                )
-
-                // 3. Draw Stations pins
-                stations.forEach { st ->
-                    val relLng = (st.longitude - centerLng) / lngMapRange
-                    val relLat = (st.latitude - centerLat) / latMapRange
-
-                    val x = (canvasWidth / 2f) + (relLng * canvasWidth).toFloat()
-                    val y = (canvasHeight / 2f) - (relLat * canvasHeight).toFloat()
-
-                    val statusColor = when (st.queueStatus) {
-                        "EMPTY" -> FuelGreen
-                        "SHORT" -> FuelShortGreen
-                        "MODERATE" -> FuelYellow
-                        "LONG" -> FuelRed
-                        else -> FuelClosed
-                    }
-
-                    // Draw outer aura glow for chosen status
-                    drawCircle(
-                        color = statusColor.copy(alpha = 0.25f),
-                        radius = 28f,
-                        center = Offset(x, y)
-                    )
-
-                    // Draw solid central node
-                    drawCircle(
-                        color = statusColor,
-                        radius = 12f,
-                        center = Offset(x, y)
-                    )
-
-                    // Draw little white center dot
-                    drawCircle(
-                        color = Color.White,
-                        radius = 4f,
-                        center = Offset(x, y)
-                    )
-                }
-
-                // 4. Draw User GPS Pin position (pulsing blue ring)
-                if (viewModel.simulateGpsEnabled) {
-                    val relUserLng = (userLng - centerLng) / lngMapRange
-                    val relUserLat = (userLat - centerLat) / latMapRange
-
-                    val cursorX = (canvasWidth / 2f) + (relUserLng * canvasWidth).toFloat()
-                    val cursorY = (canvasHeight / 2f) - (relUserLat * canvasHeight).toFloat()
-
-                    // Pulse outline circle
-                    drawCircle(
-                        color = CosmicAccent.copy(alpha = 0.35f),
-                        radius = 40f,
-                        center = Offset(cursorX, cursorY),
-                        style = Stroke(width = 3f)
-                    )
-
-                    // True center crosshair
-                    drawCircle(
-                        color = CosmicSurface,
-                        radius = 8f,
-                        center = Offset(cursorX, cursorY)
-                    )
-                    drawCircle(
-                        color = CosmicAccent,
-                        radius = 5f,
-                        center = Offset(cursorX, cursorY)
-                    )
-                }
-            }
-
-            // Top overlay legend of stats
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp)
-                    .background(CosmicSurface.copy(alpha = 0.9f), RoundedCornerShape(8.dp))
-                    .border(BorderStroke(0.5.dp, CosmicBorder), RoundedCornerShape(8.dp))
-                    .padding(8.dp)
-                    .align(Alignment.TopCenter),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MapLegendItem("فارغة", QfSuccess)
-                MapLegendItem("قصيرة", QfSuccessLight)
-                MapLegendItem("متوسطة", QfWarning)
-                MapLegendItem("مزدحمة", QfError)
-                MapLegendItem("مغلقة", QfClosed)
-            }
-
-            // Hint in bottom-left help
-            Text(
-                text = "📍 انقر على أي نقطة لتفاصيل السرا والتأكيد",
-                color = CosmicText,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 8.dp)
-                    .background(CosmicSurface.copy(alpha = 0.9f), RoundedCornerShape(12.dp))
-                    .border(BorderStroke(0.5.dp, CosmicBorder), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun MapLegendItem(name: String, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .background(color, CircleShape)
-        )
-        Text(name, color = CosmicText, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-
-// ----------------------- GPS SIMULATOR WIDGET -----------------------
-@Composable
-fun GpsSimulationControllerCard(viewModel: QueueFuelViewModel) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = CosmicSurface),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(2.dp),
-        border = BorderStroke(1.dp, CosmicBorder)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "محاكاة التواجد في محطة الوقود (GPS) 📲",
-                    color = CosmicText,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-
-                Switch(
-                    checked = viewModel.simulateGpsEnabled,
-                    onCheckedChange = { viewModel.simulateGpsEnabled = it },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = CosmicAccent
-                    )
-                )
-            }
-
-            Text(
-                text = "لتحديث السرا كاجراء آمن، يجب أن تكون قريباً <200 متر من المحطة. يمكنك تفعيل المحاكاة وتغيير إحداثياتك أدناه:",
-                fontSize = 11.sp,
-                color = CosmicTextLight,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-
-            if (viewModel.simulateGpsEnabled) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Coordinates toggles
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("موقع كركوك (النموذجية) 📍", color = CosmicText, fontSize = 11.sp)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        RadioButton(
-                            selected = viewModel.simLatitude == 35.4682,
-                            onClick = {
-                                viewModel.simLatitude = 35.4682
-                                viewModel.simLongitude = 44.3921
-                            }
-                        )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("موقع أربيل (كولان) 📍", color = CosmicText, fontSize = 11.sp)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        RadioButton(
-                            selected = viewModel.simLatitude == 36.1915,
-                            onClick = {
-                                viewModel.simLatitude = 36.1915
-                                viewModel.simLongitude = 44.0094
-                            }
-                        )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("موقع السليمانية 📍", color = CosmicText, fontSize = 11.sp)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        RadioButton(
-                            selected = viewModel.simLatitude == 35.5601,
-                            onClick = {
-                                viewModel.simLatitude = 35.5601
-                                viewModel.simLongitude = 45.4208
-                            }
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "lat: ${"%.4f".format(viewModel.simLatitude)}",
-                        color = CosmicTextGray,
-                        fontSize = 10.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "lng: ${"%.4f".format(viewModel.simLongitude)}",
-                        color = CosmicTextGray,
-                        fontSize = 10.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "نطاق الدقة: ممتاز (GPS نشط)",
-                        color = FuelGreen,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            } else {
-                Text(
-                    text = "🚨 تم تعطيل فحص القرب الجغرافي. يمكنك تحديث السرا من أي مكان (صلاحيات التطوير).",
-                    color = CosmicAmber,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-
-// ----------------------- BANNER AD SYSTEM -----------------------
-@Composable
-fun BannerAdCard(ad: AdBanner) {
-    val context = LocalContext.current
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .testTag("ad_banner_card"),
-        colors = CardDefaults.cardColors(containerColor = CosmicSurface),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, CosmicAccent.copy(alpha = 0.4f))
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(CosmicAmber, RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text("إعلان ممول 📣", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                }
-
-                Text(
-                    text = "قطاع: ${ad.category}",
-                    color = QfTextTertiary,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = ad.title,
-                color = QfTextPrimary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                textAlign = TextAlign.Right,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Text(
-                text = ad.description,
-                color = QfTextSecondary,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(vertical = 4.dp),
-                textAlign = TextAlign.Right
-            )
-
-            ad.ctaPhone?.let { phone ->
-                Button(
-                    onClick = {
-                        Toast.makeText(context, "جاري فتح الاتصال بـ $phone", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .height(32.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = CosmicAccent),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(6.dp)
-                ) {
-                    Icon(Icons.Filled.PhoneInTalk, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("اتصل الآن للاستفادة", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-
-// ----------------- STATION CARD COMPONENT -----------------
-@Composable
-fun StationItemCard(
-    station: Station,
-    viewModel: QueueFuelViewModel
-) {
-    val statusProps = getQueueStatusProps(station.queueStatus)
-    val distance = viewModel.calculateDistance(
-        viewModel.simLatitude, viewModel.simLongitude,
-        station.latitude, station.longitude
-    )
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clickable { viewModel.selectedStation = station }
-            .testTag("station_card_${station.id}"),
-        colors = CardDefaults.cardColors(containerColor = CosmicSurface),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(2.dp),
-        border = BorderStroke(
-            1.dp, 
-            if (viewModel.selectedStation?.id == station.id) CosmicAccent else CosmicBorder
-        )
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            // First row: Name, ownership badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = station.name,
-                    color = CosmicText,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Box(
-                    modifier = Modifier
-                        .background(
-                            if (station.type == "حكومية") QfDeepTeal else QfWarning,
-                            RoundedCornerShape(6.dp)
-                        )
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = station.type,
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Second row: Queue status with colors
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Status glowing chip
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .background(statusProps.color, CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = statusProps.label,
-                        color = statusProps.color,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 13.sp
-                    )
-                }
-
-                // Estimated Distance
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.Navigation,
-                        contentDescription = null,
-                        tint = CosmicTextLight,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "يبعد حوالي ${"%.1f".format(distance / 1000.0)} كم",
-                        color = CosmicTextLight,
-                        fontSize = 11.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Third row: Available fuels
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Fuels text
-                Text(
-                    text = "البنزين المتوفر: ${station.fuelTypes}",
-                    color = CosmicTextLight,
-                    fontSize = 11.sp
-                )
-
-                // Confirm status with little badge
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RatingStars(confirmedCount = station.confirmedCount)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "موثوقية (${station.confirmedCount})",
-                        color = CosmicAmber,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Last Updated
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val timeFormatted = formatTime(station.lastUpdated)
-                Text(
-                    text = "آخر تحديث: $timeFormatted",
-                    color = CosmicTextGray,
-                    fontSize = 11.sp
-                )
-
-                // Quick click
-                Text(
-                    text = "انقر لمعاينة التفاصيل والتحديث ⚡",
-                    color = CosmicAccent,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-
-// Rating Star Helper
-@Composable
-fun RatingStars(confirmedCount: Int) {
-    val starColor = CosmicAmber
-    val size = 12.dp
-    Row {
-        Icon(
-            imageVector = if (confirmedCount >= 5) Icons.Filled.Star else Icons.Outlined.Star,
-            contentDescription = null,
-            tint = starColor,
-            modifier = Modifier.size(size)
-        )
-        Icon(
-            imageVector = if (confirmedCount >= 10) Icons.Filled.Star else Icons.Outlined.Star,
-            contentDescription = null,
-            tint = starColor,
-            modifier = Modifier.size(size)
-        )
-        Icon(
-            imageVector = if (confirmedCount >= 20) Icons.Filled.Star else Icons.Outlined.Star,
-            contentDescription = null,
-            tint = starColor,
-            modifier = Modifier.size(size)
-        )
-    }
-}
-
-
-// ----------------- STATION DETAILS WIDGET -----------------
-@Composable
-fun StationDetailBottomSheet(
-    station: Station,
-    viewModel: QueueFuelViewModel,
-    onClose: () -> Unit,
-    onOpenUpdateDialog: () -> Unit
-) {
-    val statusProps = getQueueStatusProps(station.queueStatus)
-    val userPhone = viewModel.currentUser?.phoneNumber ?: ""
-    val mockDistance = viewModel.calculateDistance(viewModel.simLatitude, viewModel.simLongitude, station.latitude, station.longitude)
-    val userIsClose = viewModel.isUserNear(station)
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f))
-            .clickable { onClose() }
-            .testTag("detail_overlay"),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = false) {}
-                .testTag("station_detail_card"),
-            colors = CardDefaults.cardColors(containerColor = CosmicSurface),
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            border = BorderStroke(1.dp, CosmicBorder)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .navigationBarsPadding()
-            ) {
-                // Close line banner
-                Box(
-                    modifier = Modifier
-                        .size(40.dp, 4.dp)
-                        .background(CosmicTextGray, CircleShape)
-                        .align(Alignment.CenterHorizontally)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = station.name,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = CosmicText
-                    )
-
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.Filled.Close, contentDescription = "اغلاق", tint = CosmicTextLight)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Detail specs
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Type
-                    Box(
-                        modifier = Modifier
-                            .background(CosmicSecondaryBg, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text("ملكية: ${station.type}", color = CosmicText, fontSize = 12.sp)
-                    }
-                    // Status
-                    Box(
-                        modifier = Modifier
-                            .background(statusProps.color.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text("حالة السرا: ${statusProps.label}", color = statusProps.color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                    // Reliability
-                    Box(
-                        modifier = Modifier
-                            .background(CosmicSecondaryBg, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text("التأكيدات: ${station.confirmedCount}", color = CosmicAmber, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Divider(color = CosmicBorder, thickness = 0.5.dp)
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "📍 الموقع الجغرافي: خط العرض ${station.latitude} / خط الطول ${station.longitude}",
-                    fontSize = 12.sp,
-                    color = CosmicTextLight,
-                    textAlign = TextAlign.Right,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Text(
-                    text = "بنزين متوفر حالياً: ${station.fuelTypes}",
-                    fontSize = 12.sp,
-                    color = CosmicTextLight,
-                    textAlign = TextAlign.Right,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Text(
-                    text = "آخر تحديث حالي: ${formatTime(station.lastUpdated)}",
-                    fontSize = 12.sp,
-                    color = CosmicTextGray,
-                    textAlign = TextAlign.Right,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Alert about GPS Distance warning
-                if (!userIsClose) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(FuelRed.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
-                            .border(1.dp, FuelRed.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                            .padding(12.dp)
-                    ) {
-                        Text(
-                            text = "⚠️ تنبيه المسافة الجغرافية:\nأنت تبعد مسافة قدرها ${"%.0f".format(mockDistance)} متر من هذه المحطة. لا يمكنك تحديث السرا إلا عند وجودك على بعد أقل من 200م لمنع البلاغات الكاذبة. (فعل 'محاكاة GPS' لمحاكاة التواجد)",
-                            fontSize = 11.sp,
-                            color = FuelRed,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Right,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(FuelGreen.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
-                            .border(1.dp, FuelGreen.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                            .padding(12.dp)
-                    ) {
-                        Text(
-                            text = "🟢 تحقق جغرافي ناجح:\nأنت متواجد جغرافياً داخل نطاق المحطة (${"%.0f".format(mockDistance)}م)! يمكنك الآن الإبلاغ أو تأكيد السرا بأمان والمساهمة بنقاطك.",
-                            fontSize = 11.sp,
-                            color = FuelGreen,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Right,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // ACTIONS Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Quick confirm status button (+5 pts)
-                    Button(
-                        onClick = { viewModel.confirmStatus(station.id) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp)
-                            .testTag("confirm_station_status"),
-                        colors = ButtonDefaults.buttonColors(containerColor = CosmicAccent),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Filled.ThumbUp, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("أنا بالمحطة وأؤكد هذا السرا (+5ن)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    // Report/Update brand new status action (+15 pts)
-                    Button(
-                        onClick = { onOpenUpdateDialog() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp)
-                            .testTag("report_new_status"),
-                        colors = ButtonDefaults.buttonColors(containerColor = CosmicTeal),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Filled.EditLocation, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("حدّث حالة السرا الآن (+15ن)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-// -------- SUBMIT STATUS UPDATE DIALOG ----------
-@Composable
-fun UpdateStatusSubmissionDialog(
-    station: Station,
-    viewModel: QueueFuelViewModel,
-    onClose: () -> Unit
-) {
-    var selectedStatus by remember { mutableStateOf("EMPTY") }
-    var hasFuel by remember { mutableStateOf(true) }
-    var selectedFuelKind by remember { mutableStateOf("عادي") }
-    var photoPath by remember { mutableStateOf<String?>(null) }
-
-    val cameraLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        if (bitmap != null) photoPath = viewModel.saveReportPhoto(bitmap)
-    }
-    val galleryLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
-        if (uri != null) photoPath = viewModel.importReportPhoto(uri)
-    }
-
-    AlertDialog(
-        onDismissRequest = onClose,
-        title = {
-            Text(
-                text = "تقرير حالة الطابور 📋",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                textAlign = TextAlign.Right,
-                color = CosmicText,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.End
-            ) {
-                Text("المحطة: ${station.name}", fontSize = 12.sp, color = CosmicTextLight)
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text("1. ما هي حالة طابور السرا الحالي؟", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CosmicText, modifier = Modifier.padding(bottom = 6.dp))
-                // Choices row
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    val statuses = listOf(
-                        "EMPTY" to "فارغة 🟢 (لا يوجد ازدحام)",
-                        "MODERATE" to "متوسطة 🟠 (ازدحام متوسط)",
-                        "LONG" to "مزدحمة 🔴 (طابور طويل جداً)"
-                    )
-                    
-                    statuses.forEach { item ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { selectedStatus = item.first }
-                                .background(
-                                    if (selectedStatus == item.first) CosmicSecondaryBg else Color.Transparent,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .padding(8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = selectedStatus == item.first,
-                                onClick = { selectedStatus = item.first }
-                            )
-                            Text(text = item.second, color = CosmicText, fontSize = 12.sp)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("2. هل البنزين متوفر جردياً؟", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CosmicText, modifier = Modifier.padding(bottom = 6.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("نعم، متوفر بشكل طبيعي", color = CosmicText, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Switch(
-                        checked = hasFuel,
-                        onCheckedChange = { hasFuel = it }
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("لا يوجد وقود حالياً", color = CosmicTextLight, fontSize = 12.sp)
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("3. ما هو نوع البنزين الذي قمت بتعبئته؟", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CosmicText, modifier = Modifier.padding(bottom = 6.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val fuelOptions = listOf("عادي", "محسن", "سوبر")
-                    fuelOptions.forEach { opt ->
-                        val isSel = selectedFuelKind == opt
-                        Box(
-                            modifier = Modifier
-                                .clickable { selectedFuelKind = opt }
-                                .background(
-                                    if (isSel) CosmicAccent else CosmicSecondaryBg,
-                                    RoundedCornerShape(20.dp)
-                                )
-                                .padding(horizontal = 14.dp, vertical = 6.dp)
-                        ) {
-                            Text(opt, color = if (isSel) Color.White else CosmicText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("4. صورة من المحطة (إلزامية) 📷", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CosmicText, modifier = Modifier.padding(bottom = 6.dp))
-
-                if (photoPath != null) {
-                    AsyncImage(
-                        model = java.io.File(photoPath!!),
-                        contentDescription = "صورة التقرير",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .border(1.dp, CosmicBorder, RoundedCornerShape(10.dp))
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { cameraLauncher.launch(null) },
-                        modifier = Modifier.weight(1f).testTag("take_photo_button"),
-                        border = BorderStroke(1.dp, CosmicAccent),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(if (photoPath == null) "التقط صورة 📸" else "إعادة الالتقاط 📸", fontSize = 11.sp, color = CosmicAccent, fontWeight = FontWeight.Bold)
-                    }
-                    OutlinedButton(
-                        onClick = { galleryLauncher.launch("image/*") },
-                        modifier = Modifier.weight(1f).testTag("pick_photo_button"),
-                        border = BorderStroke(1.dp, CosmicBorder),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("من المعرض 🖼️", fontSize = 11.sp, color = CosmicTextLight, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(CosmicAccent.copy(alpha = 0.10f), RoundedCornerShape(8.dp))
-                        .border(1.dp, CosmicAccent.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
-                        .padding(8.dp)
-                ) {
-                    Text(
-                        text = "🤖 سيتم التحقق آلياً من مطابقة الصورة لموقع المحطة ومستوى الازدحام قبل قبول التقرير ومنح النقاط ودخول سحب الجوائز.",
-                        fontSize = 10.sp,
-                        color = CosmicAccent,
-                        textAlign = TextAlign.Right,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    viewModel.submitStatusUpdate(
-                        stationId = station.id,
-                        newQueueStatus = selectedStatus,
-                        hasFuel = hasFuel,
-                        selectedFuel = selectedFuelKind,
-                        photoPath = photoPath
-                    )
-                    onClose()
-                },
-                enabled = photoPath != null,
-                colors = ButtonDefaults.buttonColors(containerColor = CosmicTeal),
-                modifier = Modifier.testTag("submit_update_dialog_btn")
-            ) {
-                Text(if (photoPath == null) "أرفق صورة أولاً 📷" else "إرسال التقرير 🚀", color = Color.White)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onClose) {
-                Text("تراجع", color = CosmicTextGray)
-            }
-        },
-        containerColor = CosmicSurface,
-        titleContentColor = CosmicText,
-        textContentColor = CosmicTextLight
-    )
-}
-
-
 // Status Prop helper — the four queue states of the design system:
 // empty = green, medium = orange, crowded = red, closed = gray.
 data class StatusProps(val label: String, val color: Color)
 fun getQueueStatusProps(status: String): StatusProps {
     return when (status) {
-        "EMPTY" -> StatusProps("فارغة 🟢", QfSuccess)
-        "SHORT" -> StatusProps("قصيرة 🟢", QfSuccessLight)
-        "MODERATE" -> StatusProps("متوسطة 🟠", QfWarning)
-        "LONG" -> StatusProps("مزدحمة 🔴", QfError)
-        else -> StatusProps("مغلقة ⚫", QfClosed)
+        "EMPTY" -> StatusProps("فارغة", QfSuccess)
+        "SHORT" -> StatusProps("قصيرة", QfSuccessLight)
+        "MODERATE" -> StatusProps("متوسطة", QfWarning)
+        "LONG" -> StatusProps("مزدحمة", QfError)
+        else -> StatusProps("مغلقة", QfClosed)
     }
 }
 
@@ -2882,183 +1705,6 @@ fun AdminUserBlockCard(
     }
 }
 
-
-// ----------------- 6. PROFILE AND TESTING WORKPLACE -----------------
-@Composable
-fun MyProfileScreen(viewModel: QueueFuelViewModel) {
-    val user = viewModel.currentUser ?: return
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Avatar circle
-        Box(
-            modifier = Modifier
-                .size(90.dp)
-                .background(CosmicAccent, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = user.name.take(2).uppercase(),
-                color = Color.White,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Black
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = user.name,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = CosmicText
-        )
-        Text(
-            text = "رقم الحساب: ${user.phoneNumber}",
-            fontSize = 13.sp,
-            color = CosmicTextLight
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Profile point card stats
-        Card(
-            colors = CardDefaults.cardColors(containerColor = CosmicSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, CosmicBorder),
-            elevation = CardDefaults.cardElevation(2.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "رصيد عملاتي الإنزاهية ⚡",
-                    fontSize = 12.sp,
-                    color = CosmicTextGray
-                )
-                Text(
-                    text = "${user.points} نقطة",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Black,
-                    color = CosmicAmber
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                Divider(color = CosmicBorder)
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("الصلاحية الحالية:", color = CosmicTextLight, fontSize = 12.sp)
-                    Text(user.role, color = CosmicAccent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("تقييم نزاهتي:", color = CosmicTextLight, fontSize = 12.sp)
-                    Text("موثوق وممتاز 🛡️ (100%)", color = FuelGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // TESTING UTILITY - VERY HELPFUL TO SWITCH ROLES INSTANTLY
-        Card(
-            colors = CardDefaults.cardColors(containerColor = CosmicSecondaryBg),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, CosmicBorder)
-        ) {
-            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "🛠️ لوحة التطوير السريع لتقييم المنصة:",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = CosmicAmber
-                )
-                Text(
-                    text = "لتسهيل اختبار المقيم، يمكنك تبديل الصلاحية فوراً للتحقق من واجهات المستخدم، المراسل، والمشرف (الأدمن) دون إعادة التشغيل:",
-                    fontSize = 11.sp,
-                    color = CosmicTextLight,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 6.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Button(
-                        onClick = { viewModel.switchRole("USER") },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (user.role == "USER") CosmicAccent else CosmicBorder,
-                            contentColor = if (user.role == "USER") Color.White else CosmicText
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        modifier = Modifier.height(34.dp)
-                    ) {
-                        Text("مواطن عادي", fontSize = 10.sp)
-                    }
-
-                    Button(
-                        onClick = { viewModel.switchRole("REPORTER") },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (user.role == "REPORTER") CosmicAccent else CosmicBorder,
-                            contentColor = if (user.role == "REPORTER") Color.White else CosmicText
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        modifier = Modifier.height(34.dp)
-                    ) {
-                        Text("مراسل ثان", fontSize = 10.sp)
-                    }
-
-                    if (AuthPolicy.isAdminPhone(user.phoneNumber)) {
-                        Button(
-                            onClick = { viewModel.switchRole("ADMIN") },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (user.role == "ADMIN") CosmicAmber else CosmicBorder,
-                                contentColor = if (user.role == "ADMIN") Color.Black else CosmicText
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.height(34.dp)
-                        ) {
-                            Text("أدمن مشرف 👮‍♀️", fontSize = 10.sp)
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Logout
-        Button(
-            onClick = { viewModel.logout() },
-            colors = ButtonDefaults.buttonColors(containerColor = CosmicBorder),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .testTag("logout_button")
-        ) {
-            Icon(Icons.Filled.Logout, contentDescription = null, tint = CosmicText)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("تسجيل الخروج من الحساب", color = CosmicText, fontWeight = FontWeight.Bold)
-        }
-    }
-}
 
 @Composable
 fun FeedbackRewardDialog(viewModel: QueueFuelViewModel) {

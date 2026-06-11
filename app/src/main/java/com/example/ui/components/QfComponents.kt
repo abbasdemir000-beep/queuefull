@@ -8,17 +8,23 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.HomeRepairService
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -232,5 +238,146 @@ fun QfCategoriesGrid(
                 }
             }
         }
+    }
+}
+
+/** Rounded dark search field used at the top of the home screen. */
+@Composable
+fun QfSearchBar(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text(placeholder, color = QfTextTertiary, fontSize = 13.sp) },
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = QfTextSecondary) },
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = QfTextPrimary,
+            unfocusedTextColor = QfTextPrimary,
+            focusedContainerColor = QfSurfaceVariant,
+            unfocusedContainerColor = QfSurfaceVariant,
+            focusedBorderColor = QfDeepTeal,
+            unfocusedBorderColor = Color.Transparent
+        )
+    )
+}
+
+/** Compact selectable chip — the only filter affordance on the home screen. */
+@Composable
+fun QfChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    selectedColor: Color = QfDeepTeal
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (selected) selectedColor else QfSurfaceVariant)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp)
+    ) {
+        Text(
+            text = label,
+            color = if (selected) Color.White else QfTextSecondary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+/**
+ * Stepper for the report wizard: numbered circles joined by connector lines,
+ * teal for done/current steps — the progress style of the design board.
+ */
+@Composable
+fun QfWizardProgress(
+    stepCount: Int,
+    currentStep: Int, // 1-based
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        for (step in 1..stepCount) {
+            val reached = step <= currentStep
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .background(
+                        if (reached) QfDeepTeal else QfSurfaceVariant,
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (step < currentStep) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                } else {
+                    Text(
+                        text = step.toString(),
+                        color = if (reached) Color.White else QfTextTertiary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            if (step < stepCount) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(3.dp)
+                        .background(if (step < currentStep) QfDeepTeal else QfSurfaceVariant)
+                )
+            }
+        }
+    }
+}
+
+/** Top bar for pushed sub-screens (details, alerts, suggestions, admin…). */
+@Composable
+fun QfSubScreenTopBar(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    actions: @Composable RowScope.() -> Unit = {}
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(QfSurface)
+            .statusBarsPadding()
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack, modifier = Modifier.testTag("subscreen_back")) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "رجوع",
+                tint = QfTextPrimary
+            )
+        }
+        Text(
+            text = title,
+            color = QfTextPrimary,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        actions()
     }
 }
