@@ -86,6 +86,21 @@ class AuthPolicyTest {
         assertFalse(AuthPolicy.isAdminPhone("07712345678"))
     }
 
+    // ---- Effective role (server role wins over the hardcoded phone) ----
+
+    @Test
+    fun `server-assigned role overrides the local fallback`() {
+        assertEquals("ADMIN", AuthPolicy.effectiveRole("ADMIN", "07712345678"))
+        assertEquals("USER", AuthPolicy.effectiveRole("USER", "07774564334"))
+    }
+
+    @Test
+    fun `missing or blank server role falls back to the phone-based role`() {
+        assertEquals("ADMIN", AuthPolicy.effectiveRole(null, "07774564334"))
+        assertEquals("ADMIN", AuthPolicy.effectiveRole("", "07774564334"))
+        assertEquals("USER", AuthPolicy.effectiveRole(null, "07712345678"))
+    }
+
     // ---- Ban check ----
 
     @Test

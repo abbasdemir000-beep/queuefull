@@ -54,6 +54,15 @@ object AuthPolicy {
     fun isAdminPhone(phone: String): Boolean = phone == ADMIN_PHONE
 
     /**
+     * Resolves the effective role once a backend exists: a server-assigned
+     * role (`users/{uid}.role` in Firestore, written only by Cloud Functions /
+     * the console) always wins; the hardcoded admin phone remains only as the
+     * offline-demo fallback when no backend is configured.
+     */
+    fun effectiveRole(serverRole: String?, phone: String): String =
+        serverRole?.takeIf { it.isNotBlank() } ?: resolveRole(phone)
+
+    /**
      * True if the user account is banned and should be rejected at login.
      */
     fun isUserBanned(user: AppUser): Boolean = user.banned
