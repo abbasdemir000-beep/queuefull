@@ -5,6 +5,11 @@
     <!-- Cloud sync (Firebase RTDB REST) and the future AI verification API -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Real device location for the report/confirm geofence (FusedLocationProvider).
+         The app stays fully usable without it via the map-screen GPS simulation. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <!-- allowBackup=false: points/roles live in the local DB, so a restored or
          edited backup would be a trivial way to forge points or admin state -->
     <application

@@ -155,7 +155,7 @@ private fun WizardStepLocation(
     val nearestStations = (if (approvedStations.isEmpty()) emptyList() else viewModel.filteredStationsList)
         .sortedBy { st ->
             viewModel.calculateDistance(
-                viewModel.simLatitude, viewModel.simLongitude,
+                viewModel.currentLatitude, viewModel.currentLongitude,
                 st.latitude, st.longitude
             )
         }
@@ -202,7 +202,7 @@ private fun WizardStepLocation(
         ) {
             items(nearestStations) { station ->
                 val distance = viewModel.calculateDistance(
-                    viewModel.simLatitude, viewModel.simLongitude,
+                    viewModel.currentLatitude, viewModel.currentLongitude,
                     station.latitude, station.longitude
                 )
                 val selected = targetStation?.id == station.id

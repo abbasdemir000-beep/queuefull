@@ -747,8 +747,8 @@ fun SuggestionsAndClaims(viewModel: QueueFuelViewModel) {
                     ) {
                         OutlinedButton(
                             onClick = {
-                                viewModel.suggestStationLat = viewModel.simLatitude
-                                viewModel.suggestStationLng = viewModel.simLongitude
+                                viewModel.suggestStationLat = viewModel.currentLatitude
+                                viewModel.suggestStationLng = viewModel.currentLongitude
                                 Toast.makeText(viewModel.getApplication(), "تم تعيين خطوط العرض من موقعك الحالي!", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.padding(top = 6.dp)

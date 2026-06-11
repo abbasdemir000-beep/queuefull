@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -13,10 +16,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
@@ -118,7 +123,15 @@ fun MapScreen(
             MapLegendDot("مغلق", QfClosed)
         }
 
-        // GPS simulation quick toggle (the MVP's location source)
+        // Location controls: real GPS (FusedLocationProvider) plus the MVP's
+        // simulation toggle as fallback. A fresh real fix wins everywhere.
+        val locationPermissionLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { result ->
+            val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+            viewModel.onLocationPermissionResult(granted)
+        }
         Row(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -129,7 +142,44 @@ fun MapScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text("GPS", color = QfTextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            IconButton(
+                onClick = {
+                    if (viewModel.locationPermissionGranted) {
+                        viewModel.refreshRealLocation()
+                    } else {
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    }
+                },
+                modifier = Modifier
+                    .size(34.dp)
+                    .testTag("map_locate_me_button")
+            ) {
+                if (viewModel.isLocating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = QfTurquoise,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.MyLocation,
+                        contentDescription = "تحديد موقعي الحقيقي",
+                        tint = if (viewModel.usingRealLocation) QfTurquoise else QfTextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            Text(
+                text = if (viewModel.usingRealLocation) "GPS حقيقي" else "GPS",
+                color = if (viewModel.usingRealLocation) QfTurquoise else QfTextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
             Switch(
                 checked = viewModel.simulateGpsEnabled,
                 onCheckedChange = { viewModel.simulateGpsEnabled = it },
@@ -145,7 +195,7 @@ fun MapScreen(
         pinnedStation?.let { station ->
             val statusProps = getQueueStatusProps(station.queueStatus)
             val distance = viewModel.calculateDistance(
-                viewModel.simLatitude, viewModel.simLongitude,
+                viewModel.currentLatitude, viewModel.currentLongitude,
                 station.latitude, station.longitude
             )
             Card(
@@ -241,8 +291,8 @@ fun QueueMapCanvas(
     onStationTap: (Station) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val userLat = viewModel.simLatitude
-    val userLng = viewModel.simLongitude
+    val userLat = viewModel.currentLatitude
+    val userLng = viewModel.currentLongitude
 
     val centerLat = if (stations.isNotEmpty()) stations.map { it.latitude }.average() else userLat
     val centerLng = if (stations.isNotEmpty()) stations.map { it.longitude }.average() else userLng
@@ -327,8 +377,8 @@ fun QueueMapCanvas(
             drawCircle(Color.White, radius = 4.5f, center = Offset(x, y))
         }
 
-        // User location (pulsing teal ring)
-        if (viewModel.simulateGpsEnabled) {
+        // User location (pulsing teal ring) — drawn for a real fix or while simulating
+        if (viewModel.usingRealLocation || viewModel.simulateGpsEnabled) {
             val relUserLng = (userLng - centerLng) / lngMapRange
             val relUserLat = (userLat - centerLat) / latMapRange
             val cursorX = (canvasWidth / 2f) + (relUserLng * canvasWidth).toFloat()
