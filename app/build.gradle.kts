@@ -82,6 +82,14 @@ dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
   implementation(libs.firebase.analytics)
+  // Real backend foundation (Firestore + anonymous Auth + FCM + Storage).
+  // Gated at runtime: with the placeholder google-services.json the app
+  // never touches Firebase and stays fully offline (FirebaseBackendGateway).
+  implementation(libs.firebase.auth)
+  implementation(libs.firebase.firestore)
+  implementation(libs.firebase.messaging)
+  implementation(libs.firebase.storage)
+  implementation(libs.kotlinx.coroutines.play.services)
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
   // implementation(libs.androidx.camera.camera2)
