@@ -64,7 +64,7 @@ fun PlaceDetailsScreen(
     val statusProps = getQueueStatusProps(station.queueStatus)
     val isOpen = station.queueStatus != "CLOSED"
     val distance = viewModel.calculateDistance(
-        viewModel.simLatitude, viewModel.simLongitude,
+        viewModel.currentLatitude, viewModel.currentLongitude,
         station.latitude, station.longitude
     )
     val userIsClose = viewModel.isUserNear(station)

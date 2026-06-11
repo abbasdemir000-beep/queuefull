@@ -7,12 +7,14 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.compose.runtime.mutableStateListOf
+import com.example.data.location.RealLocationDataSource
 import com.example.data.repository.QueueFuelRepositoryImpl
 import com.example.domain.model.*
 import com.example.domain.repository.QueueFuelRepository
 import com.example.domain.usecase.AuthPolicy
 import com.example.domain.usecase.CloudSyncPayload
 import com.example.domain.usecase.CyclePolicy
+import com.example.domain.usecase.LocationPolicy
 import com.example.domain.usecase.GeoProximity
 import com.example.domain.usecase.PointsPolicy
 import com.example.domain.usecase.ReportVerificationRequest
@@ -70,10 +72,54 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     var filterFuelPremium by mutableStateOf(false)
     var filterFuelSuper by mutableStateOf(false)
 
-    // Location Simulation
+    // Location Simulation (fallback when no real GPS fix is available)
     var simulateGpsEnabled by mutableStateOf(true) // Defaults to true to make testing super smooth
     var simLatitude by mutableStateOf(35.4680) // default Kirkuk coord
     var simLongitude by mutableStateOf(44.3920)
+
+    // Real device location (FusedLocationProvider). A fresh fix takes priority
+    // over the simulation everywhere (see LocationPolicy).
+    var locationPermissionGranted by mutableStateOf(false)
+        private set
+    var realFix by mutableStateOf<LocationPolicy.RealFix?>(null)
+        private set
+    var isLocating by mutableStateOf(false)
+        private set
+
+    // Lazy so ViewModel construction (and Robolectric tests) never touch Play Services.
+    private val realLocation by lazy { RealLocationDataSource(getApplication()) }
+
+    /** The position every feature should use — real GPS wins over simulation. */
+    fun effectiveCoordinates(): LocationPolicy.Coordinates =
+        LocationPolicy.effectiveCoordinates(realFix, simLatitude, simLongitude, System.currentTimeMillis())
+
+    val currentLatitude: Double get() = effectiveCoordinates().latitude
+    val currentLongitude: Double get() = effectiveCoordinates().longitude
+    val usingRealLocation: Boolean get() = effectiveCoordinates().isReal
+
+    fun onLocationPermissionResult(granted: Boolean) {
+        locationPermissionGranted = granted
+        if (granted) {
+            refreshRealLocation()
+        } else {
+            showToast("لم يتم منح إذن الموقع — سيستمر استخدام الموقع التجريبي من الخريطة.")
+        }
+    }
+
+    fun refreshRealLocation() {
+        if (!locationPermissionGranted || isLocating) return
+        isLocating = true
+        viewModelScope.launch {
+            val fix = realLocation.currentFix()
+            isLocating = false
+            if (fix != null) {
+                realFix = fix
+                showToast("تم تحديد موقعك الحقيقي بنجاح! 📍")
+            } else {
+                showToast("تعذر تحديد الموقع — تأكد من تفعيل خدمة الموقع (GPS) في جهازك.")
+            }
+        }
+    }
 
     // Selected Station for detail bottom sheet/view
     var selectedStation by mutableStateOf<Station?>(null)
@@ -269,6 +315,14 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         loadFirebaseConfig()
         restoreSession()
+        // Pick up a previously granted location permission and refresh the fix
+        locationPermissionGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+            application,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (locationPermissionGranted) {
+            refreshRealLocation()
+        }
         // Automatically default selectedCityId to the first city, if available
         viewModelScope.launch {
             approvedCities.collectLatest { cities ->
@@ -400,10 +454,12 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun isUserNear(station: Station): Boolean {
-        if (!simulateGpsEnabled) return true // Bypass check if disabled / mock admin mode
-        // True if user is within the default reporting radius (200 meters)
+        val coords = effectiveCoordinates()
+        // The MVP bypass (simulation toggle off) only applies while no real
+        // fix exists — a real GPS position always enforces the 200 m geofence.
+        if (LocationPolicy.mayBypassGeofence(coords, simulateGpsEnabled)) return true
         return GeoProximity.isWithinRadius(
-            simLatitude, simLongitude, station.latitude, station.longitude
+            coords.latitude, coords.longitude, station.latitude, station.longitude
         )
     }
 
@@ -422,8 +478,9 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             val station = stations.find { it.id == stationId } ?: return@launch
 
             // 1. Proximity check:
+            val coords = effectiveCoordinates()
             if (!isUserNear(station)) {
-                val dist = calculateDistance(simLatitude, simLongitude, station.latitude, station.longitude)
+                val dist = calculateDistance(coords.latitude, coords.longitude, station.latitude, station.longitude)
                 showToast("أنت بعيد جداً (${dist.toInt()} متر) تحديثات السرا تتطلب أن تكون قريباً من المحطة (<200م)!")
                 lastReportResult = ReportFlowResult(verified = false, note = "أنت بعيد عن المحطة (${dist.toInt()} متر) — يتطلب التقرير التواجد ضمن 200م.")
                 return@launch
@@ -436,10 +493,12 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
                 return@launch
             }
 
-            // When GPS simulation is off, isUserNear() bypasses the geofence, so
-            // treat the reporter as standing at the station for verification too.
-            val reportLat = if (simulateGpsEnabled) simLatitude else station.latitude
-            val reportLng = if (simulateGpsEnabled) simLongitude else station.longitude
+            // When the geofence was bypassed (simulated position with the
+            // toggle off), treat the reporter as standing at the station so
+            // verification doesn't reject the report; real fixes are used as-is.
+            val bypassed = LocationPolicy.mayBypassGeofence(coords, simulateGpsEnabled)
+            val reportLat = if (bypassed) station.latitude else coords.latitude
+            val reportLng = if (bypassed) station.longitude else coords.longitude
 
             // 3. AI verification (stub for MVP — see ReportVerifier)
             val result = reportVerifier.verify(

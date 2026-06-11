@@ -79,7 +79,7 @@ fun HomeScreen(
 
     val nearestStations = filteredStations.sortedBy { st ->
         viewModel.calculateDistance(
-            viewModel.simLatitude, viewModel.simLongitude,
+            viewModel.currentLatitude, viewModel.currentLongitude,
             st.latitude, st.longitude
         )
     }
@@ -234,7 +234,7 @@ fun HomeScreen(
                 QueueItemCard(
                     station = station,
                     distanceMeters = viewModel.calculateDistance(
-                        viewModel.simLatitude, viewModel.simLongitude,
+                        viewModel.currentLatitude, viewModel.currentLongitude,
                         station.latitude, station.longitude
                     ),
                     onClick = { onStationClick(station) }

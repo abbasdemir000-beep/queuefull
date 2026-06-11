@@ -39,7 +39,9 @@ security, testing, release engineering).
 2. **Phone verification** (Firebase Phone Auth or SMS provider).
 3. **AI photo verification** (vision-model API key) replacing the stub via the
    existing `ReportVerifier` interface.
-4. **Real maps + GPS** (Google Maps SDK key + `play-services-location`).
+4. **Real map tiles** (Google Maps SDK key). Real GPS is already integrated:
+   FusedLocationProvider with a runtime-permission flow; a fresh fix overrides
+   the simulation and always enforces the report geofence (`LocationPolicy`).
 5. **Push notifications** (FCM; current "notifications" are an in-app log).
 6. **Production signing**: the committed `release.keystore` (password
    `android123`) is public and must never sign a Play upload. Generate a
