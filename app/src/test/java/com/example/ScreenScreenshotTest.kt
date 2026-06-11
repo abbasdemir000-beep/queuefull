@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
+import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import com.example.ui.QueueFuelViewModel
 import com.example.ui.screens.AccountScreen
@@ -25,6 +26,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -83,9 +85,7 @@ class ScreenScreenshotTest {
     }
 
     // Wait for the seeded stations to flow out of Room
-    composeTestRule.waitUntil(timeoutMillis = 30_000) {
-      viewModel.approvedStations.value.isNotEmpty()
-    }
+    waitFor("seeded stations") { viewModel.approvedStations.value.isNotEmpty() }
 
     capture("home_screen")
 
@@ -104,7 +104,7 @@ class ScreenScreenshotTest {
     viewModel.authCityInput = viewModel.approvedCities.value.firstOrNull()?.id
       ?: error("cities not seeded")
     viewModel.registerAndLogin()
-    composeTestRule.waitUntil(timeoutMillis = 30_000) { viewModel.currentUser != null }
+    waitFor("registered user") { viewModel.currentUser != null }
 
     screen = Screen.REWARDS
     capture("rewards_screen")
@@ -114,7 +114,26 @@ class ScreenScreenshotTest {
   }
 
   private fun capture(name: String) {
+    shadowOf(Looper.getMainLooper()).idle()
     composeTestRule.waitForIdle()
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/$name.png")
+  }
+
+  /**
+   * Compose's waitUntil does not pump Robolectric's paused main looper, where
+   * viewModelScope coroutines (and IO→Main resumptions) are queued — idle it
+   * explicitly on every poll so VM work can make progress.
+   */
+  private fun waitFor(what: String, condition: () -> Boolean) {
+    val deadline = System.currentTimeMillis() + 30_000
+    while (!condition()) {
+      if (System.currentTimeMillis() > deadline) {
+        throw AssertionError("Timed out waiting for $what")
+      }
+      shadowOf(Looper.getMainLooper()).idle()
+      composeTestRule.waitForIdle()
+      Thread.sleep(50)
+    }
+    shadowOf(Looper.getMainLooper()).idle()
   }
 }
