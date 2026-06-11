@@ -4,12 +4,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
-import com.example.data.local.QueueFuelDatabase
 import com.example.ui.QueueFuelViewModel
 import com.example.ui.screens.AccountScreen
 import com.example.ui.screens.HomeScreen
@@ -20,7 +21,6 @@ import com.example.ui.screens.RewardsScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,6 +32,12 @@ import org.robolectric.annotation.GraphicsMode
  * Full-screen captures of the redesigned surfaces, rendered RTL against the
  * real ViewModel + seeded Room database (Robolectric). CI uploads
  * src/test/screenshots/ as the "ui-screenshots" artifact for visual review.
+ *
+ * All screens are captured in ONE test on purpose: the Room singleton and the
+ * ViewModel's long-lived coroutines do not survive being torn down between
+ * Robolectric test methods (closing the DB mid-flight leaks uncaught
+ * exceptions into the next test), and a compose rule allows only a single
+ * setContent — so we switch screens through a state variable instead.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -40,18 +46,7 @@ class ScreenScreenshotTest {
 
   @get:Rule val composeTestRule = createComposeRule()
 
-  // The Room singleton outlives Robolectric's per-test filesystem; reset it so
-  // every test seeds a fresh database instead of reusing a stale connection.
-  @After
-  fun resetDatabaseSingleton() {
-    val field = QueueFuelDatabase::class.java.getDeclaredField("INSTANCE")
-    field.isAccessible = true
-    (field.get(null) as? QueueFuelDatabase)?.close()
-    field.set(null, null)
-  }
-
-  private fun newViewModel(): QueueFuelViewModel =
-    QueueFuelViewModel(ApplicationProvider.getApplicationContext())
+  private enum class Screen { HOME, MAP, DETAILS, WIZARD, REWARDS, ACCOUNT }
 
   /** The app renders RTL under the Arabic locale; force it for captures. */
   @Composable
@@ -61,103 +56,65 @@ class ScreenScreenshotTest {
     }
   }
 
-  private fun waitForStations(viewModel: QueueFuelViewModel) {
-    composeTestRule.waitUntil(timeoutMillis = 20_000) {
-      viewModel.approvedStations.value.isNotEmpty()
-    }
-  }
-
-  private fun registerTestUser(viewModel: QueueFuelViewModel) {
-    composeTestRule.waitUntil(timeoutMillis = 20_000) {
-      viewModel.approvedCities.value.isNotEmpty()
-    }
-    viewModel.authNameInput = "أحمد التجريبي"
-    viewModel.authPhoneInput = "07701234567"
-    viewModel.authCityInput = viewModel.approvedCities.value.first().id
-    viewModel.registerAndLogin()
-    composeTestRule.waitUntil(timeoutMillis = 20_000) { viewModel.currentUser != null }
-  }
-
   @Test
-  fun home_screen_screenshot() {
-    val viewModel = newViewModel()
-    composeTestRule.setContent {
-      Rtl { HomeScreen(viewModel = viewModel, onOpenAlerts = {}, onStationClick = {}) }
-    }
-    waitForStations(viewModel)
+  fun all_screens_screenshots() {
+    val viewModel = QueueFuelViewModel(ApplicationProvider.getApplicationContext())
+    var screen by mutableStateOf(Screen.HOME)
 
-    composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/home_screen.png")
-  }
-
-  @Test
-  fun map_screen_screenshot() {
-    val viewModel = newViewModel()
-    composeTestRule.setContent {
-      Rtl { MapScreen(viewModel = viewModel, onOpenDetails = {}) }
-    }
-    waitForStations(viewModel)
-
-    composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/map_screen.png")
-  }
-
-  @Test
-  fun place_details_screenshot() {
-    val viewModel = newViewModel()
     composeTestRule.setContent {
       val stations by viewModel.approvedStations.collectAsState()
       Rtl {
-        if (stations.isNotEmpty()) {
-          PlaceDetailsScreen(
-            station = stations.first(),
+        when (screen) {
+          Screen.HOME -> HomeScreen(viewModel = viewModel, onOpenAlerts = {}, onStationClick = {})
+          Screen.MAP -> MapScreen(viewModel = viewModel, onOpenDetails = {})
+          Screen.DETAILS -> stations.firstOrNull()?.let { station ->
+            PlaceDetailsScreen(station = station, viewModel = viewModel, onBack = {}, onNewReport = {})
+          }
+          Screen.WIZARD -> ReportWizardScreen(viewModel = viewModel, initialStation = null, onClose = {})
+          Screen.REWARDS -> RewardsScreen(viewModel = viewModel)
+          Screen.ACCOUNT -> AccountScreen(
             viewModel = viewModel,
-            onBack = {},
-            onNewReport = {}
+            onOpenAlerts = {},
+            onOpenSuggestions = {},
+            onOpenAdmin = {}
           )
         }
       }
     }
-    waitForStations(viewModel)
 
-    composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/place_details.png")
+    // Wait for the seeded stations to flow out of Room
+    composeTestRule.waitUntil(timeoutMillis = 30_000) {
+      viewModel.approvedStations.value.isNotEmpty()
+    }
+
+    capture("home_screen")
+
+    screen = Screen.MAP
+    capture("map_screen")
+
+    screen = Screen.DETAILS
+    capture("place_details")
+
+    screen = Screen.WIZARD
+    capture("report_wizard")
+
+    // Register a profile so rewards/account show real user data
+    viewModel.authNameInput = "أحمد التجريبي"
+    viewModel.authPhoneInput = "07701234567"
+    viewModel.authCityInput = viewModel.approvedCities.value.firstOrNull()?.id
+      ?: error("cities not seeded")
+    viewModel.registerAndLogin()
+    composeTestRule.waitUntil(timeoutMillis = 30_000) { viewModel.currentUser != null }
+
+    screen = Screen.REWARDS
+    capture("rewards_screen")
+
+    screen = Screen.ACCOUNT
+    capture("account_screen")
   }
 
-  @Test
-  fun report_wizard_screenshot() {
-    val viewModel = newViewModel()
-    composeTestRule.setContent {
-      Rtl { ReportWizardScreen(viewModel = viewModel, initialStation = null, onClose = {}) }
-    }
-    waitForStations(viewModel)
-
-    composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/report_wizard.png")
-  }
-
-  @Test
-  fun rewards_screen_screenshot() {
-    val viewModel = newViewModel()
-    composeTestRule.setContent {
-      Rtl { RewardsScreen(viewModel = viewModel) }
-    }
-    registerTestUser(viewModel)
-
-    composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/rewards_screen.png")
-  }
-
-  @Test
-  fun account_screen_screenshot() {
-    val viewModel = newViewModel()
-    composeTestRule.setContent {
-      Rtl {
-        AccountScreen(
-          viewModel = viewModel,
-          onOpenAlerts = {},
-          onOpenSuggestions = {},
-          onOpenAdmin = {}
-        )
-      }
-    }
-    registerTestUser(viewModel)
-
-    composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/account_screen.png")
+  private fun capture(name: String) {
+    composeTestRule.waitForIdle()
+    composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/$name.png")
   }
 }
