@@ -25,17 +25,17 @@ object CyclePolicy {
     fun shouldSendPreEndNotice(elapsedMs: Long): Boolean = elapsedMs >= PRE_END_NOTICE_DELAY_MS
 
     /**
-     * Formats remaining milliseconds as "hh:mm:ss".
+     * Formats remaining milliseconds as "hh:mm:ss", clamping negatives to zero.
      *
-     * Replicates the original logic exactly, including clamping negatives to zero
-     * via `maxOf(0L, ...)`. Locale is intentionally left unspecified to match the
-     * previous `String.format` call byte-for-byte.
+     * Uses [java.util.Locale.ROOT] so the countdown always renders ASCII digits;
+     * the default locale would render Eastern-Arabic numerals on Arabic devices
+     * and break the fixed-width hh:mm:ss display.
      */
     fun formatRemaining(remainingMs: Long): String {
         val totalSecs = maxOf(0L, remainingMs / 1000L)
         val hrs = totalSecs / 3600
         val mins = (totalSecs % 3600) / 60
         val secs = totalSecs % 60
-        return String.format("%02d:%02d:%02d", hrs, mins, secs)
+        return String.format(java.util.Locale.ROOT, "%02d:%02d:%02d", hrs, mins, secs)
     }
 }

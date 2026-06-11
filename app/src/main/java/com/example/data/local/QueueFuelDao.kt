@@ -131,6 +131,9 @@ interface QueueFuelDao {
     @Query("SELECT * FROM reward_entries WHERE monthYear = :monthYear")
     suspend fun getRewardEntriesForMonth(monthYear: String): List<RewardEntryEntity>
 
+    @Query("SELECT COUNT(*) FROM reward_entries WHERE userPhone = :phone AND isVerified = 1")
+    suspend fun countVerifiedContributions(phone: String): Int
+
     @Query("UPDATE reward_entries SET isVerified = 1 WHERE id = :id")
     suspend fun markRewardEntryVerified(id: Int)
 

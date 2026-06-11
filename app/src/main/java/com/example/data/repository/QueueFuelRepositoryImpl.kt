@@ -156,18 +156,19 @@ class QueueFuelRepositoryImpl(context: Context) : QueueFuelRepository {
             )
         )
 
-        // Check and award badges
-        val user = dao.getUserByPhone(update.userPhone)
-        if (user != null) {
-            val badge = BadgePolicy.highestEarned(user.lifetimePoints)
-            if (badge != null) {
-                val existing = dao.getBadgesForUser(update.userPhone)
-                if (existing.none { it.badge == badge.name }) {
-                    dao.insertUserBadge(
-                        UserBadgeEntity(userPhone = update.userPhone, badge = badge.name)
-                    )
-                }
-            }
+        maybeAwardBadge(update.userPhone)
+    }
+
+    /**
+     * Awards the highest badge the user has earned, based on their count of
+     * verified contributions (raffle entries), if they don't hold it yet.
+     */
+    private suspend fun maybeAwardBadge(userPhone: String) {
+        val verifiedContributions = dao.countVerifiedContributions(userPhone)
+        val badge = BadgePolicy.highestEarned(verifiedContributions) ?: return
+        val existing = dao.getBadgesForUser(userPhone)
+        if (existing.none { it.badge == badge.name }) {
+            dao.insertUserBadge(UserBadgeEntity(userPhone = userPhone, badge = badge.name))
         }
     }
 
@@ -186,6 +187,7 @@ class QueueFuelRepositoryImpl(context: Context) : QueueFuelRepository {
                 isVerified = true
             )
         )
+        maybeAwardBadge(report.userPhone)
     }
 
     override suspend fun rejectReport(reportId: Int) = withContext(Dispatchers.IO) {
@@ -206,7 +208,7 @@ class QueueFuelRepositoryImpl(context: Context) : QueueFuelRepository {
                         lastUpdated = System.currentTimeMillis()
                     )
                 )
-                rewardUserPoints(userPhone, 5)
+                rewardUserPoints(userPhone, PointsPolicy.CONFIRMATION_POINTS)
 
                 // Update confidence score
                 val existing = dao.getConfidenceForStation(stationId)

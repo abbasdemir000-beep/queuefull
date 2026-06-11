@@ -6,10 +6,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.runtime.mutableStateListOf
 import com.example.data.repository.QueueFuelRepositoryImpl
 import com.example.domain.model.*
 import com.example.domain.repository.QueueFuelRepository
 import com.example.domain.usecase.AuthPolicy
+import com.example.domain.usecase.CloudSyncPayload
 import com.example.domain.usecase.CyclePolicy
 import com.example.domain.usecase.GeoProximity
 import com.example.domain.usecase.PointsPolicy
@@ -31,6 +33,16 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     // AI verification for reports — MVP ships the deterministic stub; swap in a
     // real vision-model implementation of ReportVerifier when an API key exists.
     private val reportVerifier: ReportVerifier = StubReportVerifier()
+
+    // Shared HTTP client for cloud sync (one instance per VM, with timeouts so a
+    // dead network can't hang the sync coroutine indefinitely).
+    private val httpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
 
     // Toast event channel — UI collects and shows Toast. Keeps VM free of android.widget.Toast.
     private val _toastEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
@@ -103,10 +115,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     val allQueueUpdates: StateFlow<List<QueueUpdate>> = repository.allQueueUpdates
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // 5-Hour Cycle configuration for scores/rewards (timing logic lives in CyclePolicy)
-    val CYCLE_DURATION_MS = CyclePolicy.CYCLE_DURATION_MS // 5 hours in ms
-    val NOTIFICATION_TRIGGER_DELAY_MS = CyclePolicy.PRE_END_NOTICE_DELAY_MS // 4 hours 58 minutes in ms
-
+    // 5-Hour Cycle state for scores/rewards (timing logic lives in CyclePolicy)
     var cycleStartTime by mutableStateOf(0L)
     var timeRemainingString by mutableStateOf("")
     var showFeedbackRewardDialog by mutableStateOf(false)
@@ -134,24 +143,28 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun loadOrCreateCycle() {
-        var start = prefs.getLong("cycle_start_time", 0L)
+        val stored = prefs.getLong("cycle_start_time", 0L)
         val now = System.currentTimeMillis()
-        if (start == 0L || (now - start) >= CYCLE_DURATION_MS) {
-            start = now
-            prefs.edit().putLong("cycle_start_time", start).apply()
+        val expired = stored != 0L && CyclePolicy.isCycleComplete(stored, now)
+        if (stored == 0L || expired) {
+            prefs.edit().putLong("cycle_start_time", now).apply()
             prefs.edit().putBoolean("reward_notice_sent", false).apply()
-            // Reset points if it actually expired (or call trigger cycle reset)
-            if (start != now) {
+            // Points are only reset when an actual cycle expired while the app
+            // was closed — not on the very first launch.
+            if (expired) {
                 resetCycleAction()
             }
+            cycleStartTime = now
+        } else {
+            cycleStartTime = stored
         }
-        cycleStartTime = start
     }
 
     fun resetCycleAction() {
         viewModelScope.launch {
-            // Reset regular users points to 20
-            allUsers.value.forEach { u ->
+            // Reset regular users' points (read from the repository directly so
+            // this works even when no screen is collecting the user stream)
+            repository.allUsers.first().forEach { u ->
                 if (u.role != "ADMIN") {
                     repository.updateUser(u.copy(points = PointsPolicy.CYCLE_RESET_POINTS))
                 }
@@ -176,7 +189,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             
             viewModelScope.launch {
                 // Reset points for non-admins
-                allUsers.value.forEach { u ->
+                repository.allUsers.first().forEach { u ->
                     if (u.role != "ADMIN") {
                         repository.updateUser(u.copy(points = PointsPolicy.CYCLE_RESET_POINTS))
                     }
@@ -302,7 +315,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
         if (!AuthPolicy.isValidPhone(authPhoneInput)) {
-            showToast("الرجاء إدخال رقم هاتف صحيح (10 أرقام على الأقل)")
+            showToast("الرجاء إدخال رقم هاتف صحيح (أرقام فقط، 10 أرقام على الأقل)")
             return
         }
         val cityId = authCityInput
@@ -713,7 +726,9 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
 
     // Expiry simulations: Each update expires after 30-45 minutes.
     private suspend fun expireOldUpdates() {
-        val currentStations = allStations.value
+        // Read from the repository directly: the StateFlow's value is empty
+        // whenever no screen is subscribed, which would silently skip expiry.
+        val currentStations = repository.allStations.first()
         val now = System.currentTimeMillis()
         currentStations.forEach { station ->
             // If last updated is older than 40 minutes (2,400,000 ms) and not EMPTY, reset to EMPTY or moderate
@@ -782,45 +797,23 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
 
         viewModelScope.launch {
             try {
-                val usersJson = allUsers.value.filter { it.role != "ADMIN" }.joinToString(",") { u ->
-                    """{"phoneNumber":"${u.phoneNumber}","name":"${u.name}","role":"${u.role}","points":${u.points}}"""
-                }
-                val stationsJson = allStations.value.joinToString(",") { s ->
-                    """{"id":${s.id},"name":"${s.name}","cityId":${s.cityId},"cityName":"${s.cityName}","type":"${s.type}","queueStatus":"${s.queueStatus}","hasFuel":${s.hasFuel},"isApproved":${s.isApproved}}"""
-                }
-                val citiesJson = allCities.value.joinToString(",") { c ->
-                    """{"id":${c.id},"nameAr":"${c.nameAr}","nameEn":"${c.nameEn}","isApproved":${c.isApproved}}"""
-                }
-                val updatesJson = allQueueUpdates.value.joinToString(",") { q ->
-                    """{"id":${q.id},"stationId":${q.stationId},"userPhone":"${q.userPhone}","queueStatus":"${q.queueStatus}","fuelType":"${q.fuelType}","timestamp":${q.timestamp}}"""
-                }
+                // Read directly from the repository so the sync payload is
+                // complete even when no screen is collecting the StateFlows.
+                val payload = CloudSyncPayload.build(
+                    timestamp = System.currentTimeMillis(),
+                    users = repository.allUsers.first().filter { it.role != "ADMIN" },
+                    stations = repository.allStations.first(),
+                    cities = repository.allCities.first(),
+                    updates = repository.allQueueUpdates.first()
+                )
 
-                val payload = """{
-  "sync_timestamp": ${System.currentTimeMillis()},
-  "users": [$usersJson],
-  "stations": [$stationsJson],
-  "cities": [$citiesJson],
-  "queue_updates": [$updatesJson]
-}"""
-
-                var url = firebaseDatabaseUrl.trim()
-                if (url.isBlank()) {
+                val url = CloudSyncPayload.buildEndpointUrl(firebaseDatabaseUrl, firebaseWebApiKey)
+                if (url == null) {
                     firebaseSyncStatus = "خطأ: رابط فايربيس فارغ! 🔴"
                     isSyncInProgress = false
                     return@launch
                 }
-                if (!url.startsWith("http://") && !url.startsWith("https://")) {
-                    url = "https://$url"
-                }
-                if (!url.endsWith("/")) {
-                    url += "/"
-                }
-                url += "queue_fuel_data.json"
-                if (firebaseWebApiKey.isNotBlank()) {
-                    url += "?auth=$firebaseWebApiKey"
-                }
 
-                val client = OkHttpClient()
                 val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                 val body = payload.toRequestBody(mediaType)
                 val request = Request.Builder()
@@ -829,15 +822,17 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
                     .build()
 
                 val response = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    client.newCall(request).execute()
+                    httpClient.newCall(request).execute()
                 }
 
-                if (response.isSuccessful) {
-                    firebaseSyncStatus = "متصل سحابياً ومزامن بنجاح! 🟢"
-                    showToast("تمت مزامنة كافة البيانات وصلاحيات الأدمن بنجاح مع الفايربيس! ☁️🏁")
-                } else {
-                    firebaseSyncStatus = "فشل المزامنة: رمز الخطأ ${response.code} 🔴"
-                    showToast("خطأ استجابة الفايربيس: ${response.code}. يرجى التحقق من القواعد!")
+                response.use {
+                    if (it.isSuccessful) {
+                        firebaseSyncStatus = "متصل سحابياً ومزامن بنجاح! 🟢"
+                        showToast("تمت مزامنة كافة البيانات وصلاحيات الأدمن بنجاح مع الفايربيس! ☁️🏁")
+                    } else {
+                        firebaseSyncStatus = "فشل المزامنة: رمز الخطأ ${it.code} 🔴"
+                        showToast("خطأ استجابة الفايربيس: ${it.code}. يرجى التحقق من القواعد!")
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -865,6 +860,3 @@ data class ReportFlowResult(
     val verified: Boolean,
     val note: String
 )
-
-// Extension for compose state mutability
-fun <T> mutableStateListOf(vararg elements: T) = androidx.compose.runtime.mutableStateListOf(*elements)

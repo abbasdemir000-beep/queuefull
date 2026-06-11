@@ -22,6 +22,18 @@ class AuthPolicyTest {
         assertFalse(AuthPolicy.isValidPhone(""))
     }
 
+    @Test
+    fun `phone containing non-digits is invalid`() {
+        assertFalse(AuthPolicy.isValidPhone("abcdefghij"))
+        assertFalse(AuthPolicy.isValidPhone("0777-456-433"))
+        assertFalse(AuthPolicy.isValidPhone("0777 456 433"))
+    }
+
+    @Test
+    fun `surrounding whitespace is ignored`() {
+        assertTrue(AuthPolicy.isValidPhone(" 07774564334 "))
+    }
+
     // ---- Name validation ----
 
     @Test

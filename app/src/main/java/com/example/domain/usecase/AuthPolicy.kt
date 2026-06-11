@@ -21,9 +21,13 @@ object AuthPolicy {
     const val MIN_PHONE_LENGTH: Int = 10
 
     /**
-     * True if the phone number meets the minimum length requirement.
+     * True if the phone number (ignoring surrounding whitespace) consists of
+     * digits only and meets the minimum length requirement.
      */
-    fun isValidPhone(phone: String): Boolean = phone.length >= MIN_PHONE_LENGTH
+    fun isValidPhone(phone: String): Boolean {
+        val trimmed = phone.trim()
+        return trimmed.length >= MIN_PHONE_LENGTH && trimmed.all { it.isDigit() }
+    }
 
     /**
      * True if the user name is non-blank (required for registration).
