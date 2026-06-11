@@ -26,7 +26,7 @@ private val QueueFuelDarkScheme = darkColorScheme(
 )
 
 @Composable
-fun MyApplicationTheme(
+fun QueueFuelTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,

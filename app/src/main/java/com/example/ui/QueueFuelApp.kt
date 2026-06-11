@@ -31,8 +31,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.domain.model.*
-import com.example.domain.usecase.ReportVerification
 import com.example.domain.usecase.AuthPolicy
+import com.example.domain.usecase.GeoProximity
+import com.example.domain.usecase.ReportVerification
 import com.example.ui.components.QfSubScreenTopBar
 import com.example.ui.components.QueueFuelLogo
 import com.example.ui.components.QueueFuelSplashScreen
@@ -47,7 +48,6 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.widget.Toast
 import kotlinx.coroutines.flow.collectLatest
-import kotlin.math.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 
 // Bottom navigation of the design board: الرئيسية / الخريطة / تقرير + / المكافآت / الحساب
@@ -860,15 +860,9 @@ fun SuggestionsAndClaims(viewModel: QueueFuelViewModel) {
 
 fun checkDuplicateWithinLimit(lat: Double, lng: Double, stations: List<Station>): Boolean {
     // Return true if any station is within 100 meters
-    for (st in stations) {
-        val r = 6371000.0 // Earth radius in meters
-        val dLat = Math.toRadians(st.latitude - lat)
-        val dLon = Math.toRadians(st.longitude - lng)
-        val a = sin(dLat / 2).pow(2) + cos(Math.toRadians(lat)) * cos(Math.toRadians(st.latitude)) * sin(dLon / 2).pow(2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        if (r * c < 100.0) return true
+    return stations.any { st ->
+        GeoProximity.distanceMeters(lat, lng, st.latitude, st.longitude) < 100.0
     }
-    return false
 }
 
 
@@ -1188,27 +1182,27 @@ fun AdminDashboardPanel(viewModel: QueueFuelViewModel) {
             Tab(
                 selected = adminSectionTab == 0,
                 onClick = { adminSectionTab = 0 },
-                text =_text_wrap("المحطات المعلقة (${pendingStations.size})")
+                text = adminTabLabel("المحطات المعلقة (${pendingStations.size})")
             )
             Tab(
                 selected = adminSectionTab == 1,
                 onClick = { adminSectionTab = 1 },
-                text = _text_wrap("المدن المعلقة (${pendingCities.size})")
+                text = adminTabLabel("المدن المعلقة (${pendingCities.size})")
             )
             Tab(
                 selected = adminSectionTab == 2,
                 onClick = { adminSectionTab = 2 },
-                text = _text_wrap("إدارة الحسابات")
+                text = adminTabLabel("إدارة الحسابات")
             )
             Tab(
                 selected = adminSectionTab == 3,
                 onClick = { adminSectionTab = 3 },
-                text = _text_wrap("سحاب الفايربيس 🌐")
+                text = adminTabLabel("سحاب الفايربيس 🌐")
             )
             Tab(
                 selected = adminSectionTab == 4,
                 onClick = { adminSectionTab = 4 },
-                text = _text_wrap("التقارير 📋 ($unverifiedReports)"),
+                text = adminTabLabel("التقارير 📋 ($unverifiedReports)"),
                 modifier = Modifier.testTag("admin_reports_tab")
             )
         }
@@ -1402,7 +1396,7 @@ fun AdminReportReviewCard(
 }
 
 @Composable
-fun _text_wrap(txt: String): @Composable () -> Unit = {
+fun adminTabLabel(txt: String): @Composable () -> Unit = {
     Text(txt, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = CosmicText)
 }
 

@@ -3,16 +3,8 @@ package com.example.domain.usecase
 /**
  * Single source of truth for the rewards/points economy.
  *
- * Pure and framework-agnostic. These values were previously scattered as magic
- * numbers across the ViewModel and the repository. This PR routes the
- * ViewModel's usages through these constants (no behavior change — the values
- * are identical).
- *
- * NOTE (scope): [REPORT_POINTS] and [CONFIRMATION_POINTS] are currently still
- * applied as literals inside `QueueFuelRepositoryImpl`. They are declared here as
- * the canonical policy and are covered by unit tests; the repository will be
- * migrated to reference them in a later PR (out of scope for "extract from
- * ViewModel only").
+ * Pure and framework-agnostic. Both the ViewModel and the repository award
+ * points exclusively through these constants.
  */
 object PointsPolicy {
 

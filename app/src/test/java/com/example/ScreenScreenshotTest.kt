@@ -19,7 +19,7 @@ import com.example.ui.screens.MapScreen
 import com.example.ui.screens.PlaceDetailsScreen
 import com.example.ui.screens.ReportWizardScreen
 import com.example.ui.screens.RewardsScreen
-import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.QueueFuelTheme
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -54,7 +54,7 @@ class ScreenScreenshotTest {
   @Composable
   private fun Rtl(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-      MyApplicationTheme { content() }
+      QueueFuelTheme { content() }
     }
   }
 

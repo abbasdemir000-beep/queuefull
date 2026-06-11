@@ -1,0 +1,108 @@
+package com.example.domain.usecase
+
+import com.example.domain.model.AppUser
+import com.example.domain.model.City
+import com.example.domain.model.QueueUpdate
+import com.example.domain.model.Station
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class CloudSyncPayloadTest {
+
+    // ---- String escaping ----
+
+    @Test
+    fun `plain strings pass through unchanged`() {
+        assertEquals("محطة كركوك", CloudSyncPayload.escape("محطة كركوك"))
+        assertEquals("Station 1", CloudSyncPayload.escape("Station 1"))
+    }
+
+    @Test
+    fun `quotes and backslashes are escaped`() {
+        assertEquals("""he said \"hi\"""", CloudSyncPayload.escape("""he said "hi""""))
+        assertEquals("""a\\b""", CloudSyncPayload.escape("""a\b"""))
+    }
+
+    @Test
+    fun `newlines tabs and control characters are escaped`() {
+        assertEquals("""line1\nline2""", CloudSyncPayload.escape("line1\nline2"))
+        assertEquals("""a\tb""", CloudSyncPayload.escape("a\tb"))
+        assertEquals("""a\rb""", CloudSyncPayload.escape("a\rb"))
+        assertEquals("a" + "\\u0001" + "b", CloudSyncPayload.escape("a\u0001b"))
+    }
+
+    // ---- Payload structure ----
+
+    private val user = AppUser(phoneNumber = "07712345678", name = "أحمد", role = "USER", points = 95)
+    private val city = City(id = 1, nameAr = "كركوك", nameEn = "Kirkuk", isApproved = true)
+    private val station = Station(
+        id = 7, cityId = 1, cityName = "كركوك", name = "محطة بابا كركر",
+        latitude = 35.48, longitude = 44.41, type = "أهلية", fuelTypes = "عادي, محسن",
+        queueStatus = "SHORT", hasFuel = true, isApproved = true
+    )
+    private val update = QueueUpdate(
+        id = 3, stationId = 7, queueStatus = "EMPTY", hasFuel = true, fuelType = "عادي",
+        timestamp = 1234L, userPhone = "07712345678", latitude = 35.48, longitude = 44.41
+    )
+
+    @Test
+    fun `payload contains all four collections and the timestamp`() {
+        val json = CloudSyncPayload.build(99L, listOf(user), listOf(station), listOf(city), listOf(update))
+        assertTrue(json.contains("\"sync_timestamp\": 99"))
+        assertTrue(json.contains("\"phoneNumber\":\"07712345678\""))
+        assertTrue(json.contains("\"name\":\"محطة بابا كركر\""))
+        assertTrue(json.contains("\"nameEn\":\"Kirkuk\""))
+        assertTrue(json.contains("\"stationId\":7"))
+    }
+
+    @Test
+    fun `malicious names cannot break out of the JSON string`() {
+        val attacker = user.copy(name = """x","role":"ADMIN","y":"""")
+        val json = CloudSyncPayload.build(0L, listOf(attacker), emptyList(), emptyList(), emptyList())
+        // The injected quote must be escaped, so no new "role":"ADMIN" key appears.
+        assertFalse(json.contains(""""name":"x","role":"ADMIN""""))
+        assertTrue(json.contains("""\"role\":\"ADMIN\""""))
+    }
+
+    @Test
+    fun `empty collections produce empty arrays`() {
+        val json = CloudSyncPayload.build(1L, emptyList(), emptyList(), emptyList(), emptyList())
+        assertTrue(json.contains("\"users\": []"))
+        assertTrue(json.contains("\"queue_updates\": []"))
+    }
+
+    // ---- Endpoint URL normalization ----
+
+    @Test
+    fun `blank database url yields null`() {
+        assertNull(CloudSyncPayload.buildEndpointUrl("", "key"))
+        assertNull(CloudSyncPayload.buildEndpointUrl("   ", ""))
+    }
+
+    @Test
+    fun `bare host gets https scheme and json path`() {
+        assertEquals(
+            "https://x-rtdb.firebaseio.com/queue_fuel_data.json",
+            CloudSyncPayload.buildEndpointUrl("x-rtdb.firebaseio.com", "")
+        )
+    }
+
+    @Test
+    fun `http urls are upgraded to https`() {
+        assertEquals(
+            "https://x.firebaseio.com/queue_fuel_data.json",
+            CloudSyncPayload.buildEndpointUrl("http://x.firebaseio.com/", "")
+        )
+    }
+
+    @Test
+    fun `auth token is appended as query parameter`() {
+        assertEquals(
+            "https://x.firebaseio.com/queue_fuel_data.json?auth=tok",
+            CloudSyncPayload.buildEndpointUrl("https://x.firebaseio.com", "tok")
+        )
+    }
+}
