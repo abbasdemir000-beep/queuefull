@@ -10,6 +10,8 @@ on:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -39,8 +41,21 @@ jobs:
       - name: Decode debug keystore
         run: base64 -d debug.keystore.base64 > debug.keystore
 
-      - name: Run unit tests
-        run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
+      # recordRoborazziDebug runs the full unit-test suite with Roborazzi
+      # recording enabled, so screen captures are actually written to
+      # app/src/test/screenshots/ (plain testDebugUnitTest no-ops them).
+      - name: Run unit tests (with Roborazzi recording)
+        run: gradle :app:recordRoborazziDebug --no-daemon --stacktrace
+
+      # Roborazzi writes screen captures during the test run — publish them
+      # so UI changes can be reviewed visually from the workflow run page.
+      - name: Upload UI screenshots artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: app/src/test/screenshots/
+          if-no-files-found: warn
 
   build:
     runs-on: ubuntu-latest
@@ -69,8 +84,20 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Decode release keystore
-        run: base64 -d release.keystore.base64 > release.keystore
+      - name: Decode keystores
+        run: |
+          base64 -d release.keystore.base64 > release.keystore
+          base64 -d debug.keystore.base64 > debug.keystore
+
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
 
       - name: Build release APK
         env:

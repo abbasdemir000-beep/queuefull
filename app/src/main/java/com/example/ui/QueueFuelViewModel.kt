@@ -65,6 +65,10 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
 
     // Selected Station for detail bottom sheet/view
     var selectedStation by mutableStateOf<Station?>(null)
+
+    // Outcome of the last submitted report — observed by the report wizard's
+    // final step to render the AI-verification result. Null while in flight.
+    var lastReportResult by mutableStateOf<ReportFlowResult?>(null)
     
     // Notifications Center (local log of changes for simulation - MVP requirement)
     private val _notifications = MutableStateFlow<List<NotificationLog>>(emptyList())
@@ -408,12 +412,14 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             if (!isUserNear(station)) {
                 val dist = calculateDistance(simLatitude, simLongitude, station.latitude, station.longitude)
                 showToast("أنت بعيد جداً (${dist.toInt()} متر) تحديثات السرا تتطلب أن تكون قريباً من المحطة (<200م)!")
+                lastReportResult = ReportFlowResult(verified = false, note = "أنت بعيد عن المحطة (${dist.toInt()} متر) — يتطلب التقرير التواجد ضمن 200م.")
                 return@launch
             }
 
             // 2. Photo is mandatory:
             if (photoPath.isNullOrBlank()) {
                 showToast("التقرير يتطلب صورة من المحطة! التقط صورة أو اخترها من المعرض 📷")
+                lastReportResult = ReportFlowResult(verified = false, note = "التقرير يتطلب صورة من الموقع.")
                 return@launch
             }
 
@@ -461,6 +467,7 @@ class QueueFuelViewModel(application: Application) : AndroidViewModel(applicatio
             } else {
                 showToast("لم يجتز تقريرك التحقق الآلي: ${result.reason} ⚠️ تم حفظه لمراجعة الأدمن.")
             }
+            lastReportResult = ReportFlowResult(verified = result.isVerified, note = result.reason)
         }
     }
 
@@ -851,6 +858,12 @@ data class NotificationLog(
     val title: String,
     val content: String,
     val timestamp: Long
+)
+
+/** UI-facing outcome of a submitted report (drives the wizard's result step). */
+data class ReportFlowResult(
+    val verified: Boolean,
+    val note: String
 )
 
 // Extension for compose state mutability

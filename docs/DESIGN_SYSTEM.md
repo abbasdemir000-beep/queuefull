@@ -92,6 +92,10 @@ Typeface: **Tajawal** (Arabic + Latin), bundled in `res/font/` and exposed as
 | `QfSectionHeader` | Section title row (white bold + muted trailing) |
 | `QfStatusBadge` | Status pill: colored dot + label on 15 %-alpha tint |
 | `QfCategoryTile` / `QfCategoriesGrid` | Home categories (4 × 2); fuel live, others "قريباً" |
+| `QfSearchBar` | Rounded dark search field (home top bar) |
+| `QfChip` | Compact selectable pill — the only filter affordance |
+| `QfWizardProgress` | Report-wizard stepper: numbered circles + connectors |
+| `QfSubScreenTopBar` | Back top-bar for pushed surfaces (details, alerts, admin) |
 
 Shape language: cards 14–16 dp radius, sheets 24 dp top radius, chips fully
 rounded. Borders are 1 dp `QfBorder`. Elevation stays ≤ 2 dp — depth comes from

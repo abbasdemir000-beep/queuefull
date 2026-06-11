@@ -37,10 +37,12 @@ Clean-ish layering under `app/src/main/java/com/example/`:
 - `data/local` — Room DB, DAO, entities, and entity↔domain `Mappers.kt`.
 - `data/repository` — `QueueFuelRepositoryImpl` (Room-backed; seeds the DB on
   first launch).
-- `ui` — `QueueFuelApp.kt` (all Compose screens) and `QueueFuelViewModel.kt`
-  (state holder); theme in `ui/theme/`, reusable design-system components in
-  `ui/components/`. The visual spec is `docs/DESIGN_SYSTEM.md` — use its
-  tokens (`Qf*` colors, Tajawal type scale); never introduce ad-hoc colors.
+- `ui` — `QueueFuelApp.kt` (navigation scaffold, login, alerts, suggestions,
+  admin), `ui/screens/` (home, map, place details, report wizard, rewards,
+  account), and `QueueFuelViewModel.kt` (state holder); theme in `ui/theme/`,
+  reusable design-system components in `ui/components/`. The visual spec is
+  `docs/DESIGN_SYSTEM.md` — use its tokens (`Qf*` colors, Tajawal type
+  scale); never introduce ad-hoc colors.
 
 `feature/` and `core/` are empty placeholders for a planned multi-module split.
 
