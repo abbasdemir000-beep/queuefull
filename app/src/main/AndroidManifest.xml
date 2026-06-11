@@ -5,8 +5,10 @@
     <!-- Cloud sync (Firebase RTDB REST) and the future AI verification API -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- allowBackup=false: points/roles live in the local DB, so a restored or
+         edited backup would be a trivial way to forge points or admin state -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"

@@ -47,6 +47,19 @@ jobs:
       - name: Run unit tests (with Roborazzi recording)
         run: gradle :app:recordRoborazziDebug --no-daemon --stacktrace
 
+      # Lint is configured with abortOnError=false for now; the report is
+      # published as an artifact so regressions are reviewable per-run.
+      - name: Run Android Lint
+        run: gradle :app:lintDebug --no-daemon --stacktrace
+
+      - name: Upload lint report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: warn
+
       # Roborazzi writes screen captures during the test run — publish them
       # so UI changes can be reviewed visually from the workflow run page.
       - name: Upload UI screenshots artifact
@@ -59,6 +72,9 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    env:
+      # Monotonic version code so every CI release build is Play-uploadable.
+      VERSION_CODE: ${{ github.run_number }}
 
     steps:
       - name: Checkout code
@@ -99,11 +115,21 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+      # The committed release.keystore (password android123) is a public
+      # placeholder — fine for sideload testing, NOT for Play publishing.
+      # Once real secrets (RELEASE_KEYSTORE_B64 / RELEASE_STORE_PASSWORD /
+      # RELEASE_KEY_PASSWORD) are configured they take precedence automatically.
+      - name: Use production keystore when secrets are configured
+        if: ${{ secrets.RELEASE_KEYSTORE_B64 != '' }}
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+        run: echo "$RELEASE_KEYSTORE_B64" | base64 -d > release.keystore
+
       - name: Build release APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
-          STORE_PASSWORD: android123
-          KEY_PASSWORD: android123
+          STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD || 'android123' }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD || 'android123' }}
         run: gradle :app:assembleRelease --no-daemon --stacktrace
 
       - name: Upload release APK artifact
@@ -111,6 +137,20 @@ jobs:
         with:
           name: release-apk
           path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Build release AAB (Play upload format)
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
+          STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD || 'android123' }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD || 'android123' }}
+        run: gradle :app:bundleRelease --no-daemon --stacktrace
+
+      - name: Upload release AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aab
+          path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
 
       - name: Copy APK to build-outputs
