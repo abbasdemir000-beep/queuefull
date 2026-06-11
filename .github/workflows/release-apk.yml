@@ -41,8 +41,11 @@ jobs:
       - name: Decode debug keystore
         run: base64 -d debug.keystore.base64 > debug.keystore
 
-      - name: Run unit tests
-        run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
+      # recordRoborazziDebug runs the full unit-test suite with Roborazzi
+      # recording enabled, so screen captures are actually written to
+      # app/src/test/screenshots/ (plain testDebugUnitTest no-ops them).
+      - name: Run unit tests (with Roborazzi recording)
+        run: gradle :app:recordRoborazziDebug --no-daemon --stacktrace
 
       # Roborazzi writes screen captures during the test run — publish them
       # so UI changes can be reviewed visually from the workflow run page.
