@@ -149,12 +149,16 @@ private fun WizardStepLocation(
     onStationSelected: (Station) -> Unit,
     onNext: () -> Unit
 ) {
-    val nearestStations = viewModel.filteredStationsList.sortedBy { st ->
-        viewModel.calculateDistance(
-            viewModel.simLatitude, viewModel.simLongitude,
-            st.latitude, st.longitude
-        )
-    }
+    // Subscribing here starts the WhileSubscribed station stream and recomposes
+    // this step on Room emissions; filteredStationsList reads the same value.
+    val approvedStations by viewModel.approvedStations.collectAsState()
+    val nearestStations = (if (approvedStations.isEmpty()) emptyList() else viewModel.filteredStationsList)
+        .sortedBy { st ->
+            viewModel.calculateDistance(
+                viewModel.simLatitude, viewModel.simLongitude,
+                st.latitude, st.longitude
+            )
+        }
     val canReport = targetStation != null &&
         (!viewModel.simulateGpsEnabled || viewModel.isUserNear(targetStation))
 

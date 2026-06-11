@@ -56,7 +56,10 @@ fun MapScreen(
     onOpenDetails: (Station) -> Unit
 ) {
     val approvedCities by viewModel.approvedCities.collectAsState()
-    val stations = viewModel.filteredStationsList
+    // Subscribing here starts the WhileSubscribed station stream and recomposes
+    // this screen on Room emissions; filteredStationsList reads the same value.
+    val approvedStations by viewModel.approvedStations.collectAsState()
+    val stations = if (approvedStations.isEmpty()) emptyList() else viewModel.filteredStationsList
     var pinnedStation by remember { mutableStateOf<Station?>(null) }
 
     // Drop the pinned card if the station left the filtered set

@@ -67,7 +67,10 @@ fun HomeScreen(
     val approvedCities by viewModel.approvedCities.collectAsState()
     val allBanners by viewModel.allBanners.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
-    val filteredStations = viewModel.filteredStationsList
+    // Subscribing here starts the WhileSubscribed station stream and recomposes
+    // this screen on Room emissions; filteredStationsList reads the same value.
+    val approvedStations by viewModel.approvedStations.collectAsState()
+    val filteredStations = if (approvedStations.isEmpty()) emptyList() else viewModel.filteredStationsList
 
     val activeCity = approvedCities.find { it.id == viewModel.selectedCityId }
     val cityBanner: AdBanner? = activeCity?.let { city ->
