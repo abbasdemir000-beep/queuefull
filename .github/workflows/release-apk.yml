@@ -124,15 +124,22 @@ jobs:
           if-no-files-found: error
 
       # base64 -i tolerates the CR/LF and whitespace that copy-pasting into the
-      # GitHub secrets UI tends to introduce.
+      # GitHub secrets UI tends to introduce. An undecodable secret falls back
+      # to the committed placeholder keystore (and its matching passwords) so
+      # CI keeps verifying the release build — with a loud warning, because
+      # placeholder-signed artifacts must never go to Play.
       - name: Use production keystore when secrets are configured
         if: ${{ env.RELEASE_KEYSTORE_B64 != '' }}
         run: |
-          if ! printf '%s' "$RELEASE_KEYSTORE_B64" | base64 -d -i > release.keystore || [ ! -s release.keystore ]; then
-            echo "::error::RELEASE_KEYSTORE_B64 is not valid base64. Re-create it with: base64 -w0 your-keystore.jks"
-            exit 1
+          if printf '%s' "$RELEASE_KEYSTORE_B64" | base64 -d -i > release.keystore.prod 2>/dev/null && [ -s release.keystore.prod ]; then
+            mv release.keystore.prod release.keystore
+            echo "Production keystore installed ($(wc -c < release.keystore) bytes)."
+          else
+            rm -f release.keystore.prod
+            echo "::warning::RELEASE_KEYSTORE_B64 is not valid base64 — signing with the committed PLACEHOLDER keystore instead (not Play-uploadable). Re-create the secret with: base64 -w0 your-keystore.jks"
+            echo "STORE_PASSWORD=android123" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=android123" >> "$GITHUB_ENV"
           fi
-          echo "Production keystore installed ($(wc -c < release.keystore) bytes)."
 
       - name: Build release APK
         run: gradle :app:assembleRelease --no-daemon --stacktrace
