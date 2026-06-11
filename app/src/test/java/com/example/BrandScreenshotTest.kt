@@ -11,7 +11,7 @@ import com.example.domain.model.QueueCategory
 import com.example.ui.components.QfCategoriesGrid
 import com.example.ui.components.QfStatusBadge
 import com.example.ui.components.QueueFuelSplashScreen
-import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.QueueFuelTheme
 import com.example.ui.theme.QfClosed
 import com.example.ui.theme.QfError
 import com.example.ui.theme.QfSuccess
@@ -34,7 +34,7 @@ class BrandScreenshotTest {
 
   @Test
   fun splash_screen_screenshot() {
-    composeTestRule.setContent { MyApplicationTheme { QueueFuelSplashScreen(onFinished = {}) } }
+    composeTestRule.setContent { QueueFuelTheme { QueueFuelSplashScreen(onFinished = {}) } }
 
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/splash_screen.png")
   }
@@ -42,7 +42,7 @@ class BrandScreenshotTest {
   @Test
   fun categories_grid_screenshot() {
     composeTestRule.setContent {
-      MyApplicationTheme {
+      QueueFuelTheme {
         QfCategoriesGrid(selectedCategory = QueueCategory.FUEL, onCategoryClick = {})
       }
     }
@@ -53,7 +53,7 @@ class BrandScreenshotTest {
   @Test
   fun status_badges_screenshot() {
     composeTestRule.setContent {
-      MyApplicationTheme {
+      QueueFuelTheme {
         Row(
           modifier = Modifier.padding(8.dp),
           horizontalArrangement = Arrangement.spacedBy(8.dp)

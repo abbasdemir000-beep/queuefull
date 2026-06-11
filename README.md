@@ -43,7 +43,7 @@ hospitals, banks, universities, …) plug into the same design system — see
 - **Kotlin** + **Jetpack Compose** (Material 3)
 - **MVVM** with an `AndroidViewModel` and a pure domain layer
 - **Room** for local persistence (KSP-generated)
-- **OkHttp / Retrofit / Moshi** for the optional Firebase REST sync
+- **OkHttp** for the optional Firebase REST sync
 - **Robolectric** + **Roborazzi** for unit and screenshot tests
 - Min SDK 24, target/compile SDK 36
 
